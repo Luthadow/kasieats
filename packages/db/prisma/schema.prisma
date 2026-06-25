@@ -1,0 +1,522 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  phone               String   @unique
+  phone_country_code  String   @default("ZA")
+  password_hash       String?
+  auth_provider       String   @default("phone")
+  firebase_uid        String?  @unique
+  user_type           String   // "customer" | "vendor" | "driver" | "admin"
+  email_verified      Boolean  @default(false)
+  email_verified_at   DateTime?
+  phone_verified      Boolean  @default(false)
+  phone_verified_at   DateTime?
+  status              String   @default("active") // "active" | "suspended" | "banned" | "deleted"
+  status_reason       String?
+  suspended_at        DateTime?
+  banned_at           DateTime?
+  deleted_at          DateTime?
+  preferred_language  String   @default("en")
+  timezone            String   @default("Africa/Johannesburg")
+  device_fingerprint  String?
+  ip_address          String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  last_login_at       DateTime?
+
+  // Relations
+  customer            Customer?
+  vendor              Vendor?
+  driver              Driver?
+
+  @@index([email])
+  @@index([phone])
+  @@index([user_type])
+  @@index([status])
+  @@index([created_at])
+}
+
+model Customer {
+  id                      String   @id @default(cuid())
+  user_id                 String   @unique
+  first_name              String
+  last_name               String
+  date_of_birth           DateTime?
+  gender                  String?
+  preferred_vendor_category String?
+  dietary_restrictions    String?
+  favorite_vendors        String[] @default([])
+  total_orders            Int      @default(0)
+  total_spent             Decimal  @default(0) @db.Decimal(10, 2)
+  last_order_at           DateTime?
+  first_order_at          DateTime?
+  loyalty_points          Int      @default(0)
+  loyalty_tier            String   @default("bronze")
+  is_active               Boolean  @default(true)
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  user                    User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  addresses               Address[]
+  orders                  Order[]
+
+  @@index([user_id])
+  @@index([loyalty_tier])
+  @@index([total_spent])
+}
+
+model Vendor {
+  id                          String   @id @default(cuid())
+  user_id                     String   @unique
+  store_name                  String
+  store_description           String?
+  store_category              String
+  phone                       String
+  email                       String?
+  address                     String
+  city                        String   @default("Rustenburg")
+  latitude                    Decimal  @db.Decimal(10, 8)
+  longitude                   Decimal  @db.Decimal(11, 8)
+  logo_url                    String?
+  banner_url                  String?
+  photo_urls                  String[] @default([])
+  operating_hours             Json     @default("{\"monday\": {\"open\": \"08:00\", \"close\": \"18:00\"}}")
+  is_open_now                 Boolean  @default(false)
+  commission_rate             Decimal  @default(15.00) @db.Decimal(5, 2)
+  bank_account_holder         String?
+  bank_account_number         String?
+  bank_code                   String?
+  tax_id                      String?
+  id_document_url             String?
+  id_document_verified        Boolean  @default(false)
+  business_registration_url   String?
+  business_registration_verified Boolean @default(false)
+  status                      String   @default("pending_approval")
+  approval_reason_if_rejected String?
+  approved_at                 DateTime?
+  approved_by_admin_id        String?
+  total_orders                Int      @default(0)
+  total_revenue               Decimal  @default(0) @db.Decimal(15, 2)
+  average_rating              Decimal  @default(0) @db.Decimal(3, 2)
+  rating_count                Int      @default(0)
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
+
+  user                        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  menus                       Menu[]
+  orders                      Order[]
+
+  @@index([user_id])
+  @@index([status])
+  @@index([store_category])
+  @@index([city])
+}
+
+model Driver {
+  id                          String   @id @default(cuid())
+  user_id                     String   @unique
+  first_name                  String
+  last_name                   String
+  date_of_birth               DateTime?
+  vehicle_type                String
+  vehicle_plate               String?
+  vehicle_color               String?
+  vehicle_make                String?
+  license_number              String?  @unique
+  license_expiry_date         DateTime?
+  license_document_url        String?
+  license_verified            Boolean  @default(false)
+  id_number                   String?  @unique
+  id_document_url             String?
+  id_verified                 Boolean  @default(false)
+  insurance_document_url      String?
+  insurance_verified          Boolean  @default(false)
+  insurance_expiry_date       DateTime?
+  vehicle_registration_url    String?
+  vehicle_registration_verified Boolean @default(false)
+  current_latitude            Decimal? @db.Decimal(10, 8)
+  current_longitude           Decimal? @db.Decimal(11, 8)
+  location_updated_at         DateTime?
+  last_delivery_zone          String?
+  status                      String   @default("pending_approval")
+  is_online                   Boolean  @default(false)
+  approval_reason_if_rejected String?
+  approved_at                 DateTime?
+  approved_by_admin_id        String?
+  total_deliveries            Int      @default(0)
+  successful_deliveries       Int      @default(0)
+  failed_deliveries           Int      @default(0)
+  total_earnings              Decimal  @default(0) @db.Decimal(15, 2)
+  pending_earnings            Decimal  @default(0) @db.Decimal(15, 2)
+  average_rating              Decimal  @default(0) @db.Decimal(3, 2)
+  rating_count                Int      @default(0)
+  background_check_completed  Boolean  @default(false)
+  background_check_date       DateTime?
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
+
+  user                        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  deliveries                  Delivery[]
+
+  @@index([user_id])
+  @@index([status])
+  @@index([is_online])
+}
+
+model Address {
+  id                  String   @id @default(cuid())
+  customer_id         String
+  label               String   // "home" | "work" | "other"
+  address_line_1      String
+  address_line_2      String?
+  city                String   @default("Rustenburg")
+  postal_code         String?
+  latitude            Decimal  @db.Decimal(10, 8)
+  longitude           Decimal  @db.Decimal(11, 8)
+  is_default          Boolean  @default(false)
+  delivery_instructions String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  customer            Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@index([is_default])
+}
+
+model Menu {
+  id                  String   @id @default(cuid())
+  vendor_id           String
+  category            String
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  vendor              Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  items               MenuItem[]
+
+  @@index([vendor_id])
+}
+
+model MenuItem {
+  id                  String   @id @default(cuid())
+  menu_id             String
+  vendor_id           String
+  name                String
+  description         String?
+  category            String?
+  price               Decimal  @db.Decimal(10, 2)
+  compare_at_price    Decimal? @db.Decimal(10, 2)
+  is_available        Boolean  @default(true)
+  stock_quantity      Int      @default(999)
+  low_stock_threshold Int      @default(5)
+  image_url           String?
+  image_urls          String[] @default([])
+  preparation_time_minutes Int  @default(15)
+  is_vegetarian       Boolean  @default(false)
+  is_vegan            Boolean  @default(false)
+  is_gluten_free      Boolean  @default(false)
+  allergens           String[] @default([])
+  display_order       Int      @default(0)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  menu                Menu     @relation(fields: [menu_id], references: [id], onDelete: Cascade)
+  order_items         OrderItem[]
+
+  @@index([vendor_id])
+  @@index([category])
+  @@index([is_available])
+}
+
+model Order {
+  id                  String   @id @default(cuid())
+  customer_id         String
+  vendor_id           String
+  driver_id           String?
+  subtotal            Decimal  @db.Decimal(10, 2)
+  delivery_fee        Decimal  @default(0) @db.Decimal(10, 2)
+  service_fee         Decimal  @default(0) @db.Decimal(10, 2)
+  discount_amount     Decimal  @default(0) @db.Decimal(10, 2)
+  total_amount        Decimal  @db.Decimal(10, 2)
+  currency            String   @default("ZAR")
+  commission_rate     Decimal? @db.Decimal(5, 2)
+  vendor_payout       Decimal? @db.Decimal(10, 2)
+  payment_method      String
+  payment_status      String   @default("pending")
+  status              String   @default("pending")
+  delivery_address    String
+  delivery_latitude   Decimal? @db.Decimal(10, 8)
+  delivery_longitude  Decimal? @db.Decimal(11, 8)
+  special_instructions String?
+  created_at          DateTime @default(now())
+  accepted_by_vendor_at DateTime?
+  marked_as_ready_at  DateTime?
+  picked_up_by_driver_at DateTime?
+  driver_en_route_at  DateTime?
+  delivered_at        DateTime?
+  cancelled_at        DateTime?
+  refunded_at         DateTime?
+  cancellation_reason String?
+  rejection_reason    String?
+  estimated_delivery_time DateTime?
+  estimated_delivery_minutes Int?
+  updated_at          DateTime @updatedAt
+
+  customer            Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  vendor              Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  order_items         OrderItem[]
+  payment             Payment?
+  delivery            Delivery?
+
+  @@index([customer_id])
+  @@index([vendor_id])
+  @@index([driver_id])
+  @@index([status])
+  @@index([created_at])
+}
+
+model OrderItem {
+  id                  String   @id @default(cuid())
+  order_id            String
+  menu_item_id        String
+  quantity            Int
+  price_per_item      Decimal  @db.Decimal(10, 2)
+  extras              Json     @default("[]")
+  extras_total        Decimal  @default(0) @db.Decimal(10, 2)
+  special_instructions String?
+  created_at          DateTime @default(now())
+
+  order               Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  menu_item           MenuItem @relation(fields: [menu_item_id], references: [id])
+
+  @@index([order_id])
+  @@index([menu_item_id])
+}
+
+model Payment {
+  id                  String   @id @default(cuid())
+  order_id            String   @unique
+  amount              Decimal  @db.Decimal(10, 2)
+  currency            String   @default("ZAR")
+  payment_method      String
+  payment_gateway     String?
+  transaction_reference String?
+  idempotency_key     String?  @unique
+  status              String   @default("pending")
+  created_at          DateTime @default(now())
+  processed_at        DateTime?
+  settled_at          DateTime?
+  refunded_at         DateTime?
+  failure_reason      String?
+  failure_code        String?
+  three_d_secure_status String?
+  card_last_four      String?
+  card_brand          String?
+  card_expiry         String?
+  refund_amount       Decimal  @default(0) @db.Decimal(10, 2)
+  refund_reason       String?
+
+  order               Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id])
+  @@index([status])
+  @@index([created_at])
+}
+
+model Delivery {
+  id                  String   @id @default(cuid())
+  order_id            String   @unique
+  driver_id           String
+  pickup_address      String
+  pickup_latitude     Decimal? @db.Decimal(10, 8)
+  pickup_longitude    Decimal? @db.Decimal(11, 8)
+  delivery_address    String
+  delivery_latitude   Decimal? @db.Decimal(10, 8)
+  delivery_longitude  Decimal? @db.Decimal(11, 8)
+  estimated_distance_km Decimal? @db.Decimal(5, 2)
+  actual_distance_km  Decimal? @db.Decimal(5, 2)
+  route_directions    String?
+  status              String   @default("assigned")
+  assigned_at         DateTime @default(now())
+  picked_up_at        DateTime?
+  en_route_at         DateTime?
+  arrived_at          DateTime?
+  delivered_at        DateTime?
+  estimated_delivery_time DateTime?
+  actual_delivery_time DateTime?
+  delivery_photo_url  String?
+  delivery_signature_url String?
+  recipient_name      String?
+  delivery_issue      String?
+  driver_notes        String?
+  driver_payment_status String @default("pending")
+  driver_earned       Decimal? @db.Decimal(10, 2)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  order               Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  driver              Driver   @relation(fields: [driver_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id])
+  @@index([driver_id])
+  @@index([status])
+}
+
+model Review {
+  id                  String   @id @default(cuid())
+  order_id            String
+  reviewer_id         String
+  reviewer_type       String   @default("customer")
+  reviewee_type       String   // "vendor" | "driver"
+  vendor_id           String?
+  driver_id           String?
+  rating              Int
+  comment             String?
+  food_quality_rating Int?
+  portion_size_rating Int?
+  professionalism_rating Int?
+  cleanliness_rating  Int?
+  is_flagged          Boolean  @default(false)
+  flagged_reason      String?
+  created_at          DateTime @default(now())
+
+  @@index([order_id])
+  @@index([vendor_id])
+  @@index([driver_id])
+  @@index([rating])
+}
+
+model Promotion {
+  id                  String   @id @default(cuid())
+  admin_id            String?
+  code                String   @unique
+  name                String
+  description         String?
+  discount_type       String   // "percentage" | "fixed_amount"
+  discount_value      Decimal  @db.Decimal(10, 2)
+  max_discount_amount Decimal? @db.Decimal(10, 2)
+  min_order_amount    Decimal  @default(0) @db.Decimal(10, 2)
+  applicable_to       String   @default("all_vendors")
+  applicable_category String?
+  applicable_vendor_id String?
+  max_usage_per_code  Int?
+  max_usage_per_customer Int    @default(1)
+  usage_count         Int      @default(0)
+  start_date          DateTime
+  end_date            DateTime
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now())
+  ended_at            DateTime?
+
+  @@index([code])
+  @@index([is_active])
+}
+
+model SupportTicket {
+  id                  String   @id @default(cuid())
+  user_id             String
+  order_id            String?
+  subject             String
+  description         String
+  category            String
+  status              String   @default("open")
+  priority            String   @default("medium")
+  assigned_to_admin_id String?
+  resolution_notes    String?
+  created_at          DateTime @default(now())
+  responded_at        DateTime?
+  resolved_at         DateTime?
+  closed_at           DateTime?
+
+  @@index([user_id])
+  @@index([status])
+  @@index([priority])
+}
+
+model Notification {
+  id                  String   @id @default(cuid())
+  user_id             String
+  title               String
+  message             String
+  notification_type   String
+  related_order_id    String?
+  related_delivery_id String?
+  action_url          String?
+  notification_method String
+  is_read             Boolean  @default(false)
+  read_at             DateTime?
+  created_at          DateTime @default(now())
+  sent_at             DateTime?
+
+  @@index([user_id])
+  @@index([notification_type])
+  @@index([is_read])
+}
+
+model Wallet {
+  id                  String   @id @default(cuid())
+  user_id             String   @unique
+  balance             Decimal  @default(0) @db.Decimal(15, 2)
+  currency            String   @default("ZAR")
+  pending_balance     Decimal  @default(0) @db.Decimal(15, 2)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  last_transaction_at DateTime?
+
+  @@index([user_id])
+}
+
+model Transaction {
+  id                  String   @id @default(cuid())
+  order_id            String?
+  delivery_id         String?
+  payment_id          String?
+  from_user_id        String?
+  to_user_id          String?
+  from_wallet_id      String?
+  to_wallet_id        String?
+  amount              Decimal  @db.Decimal(15, 2)
+  transaction_type    String
+  status              String   @default("pending")
+  reference_code      String?  @unique
+  description         String?
+  metadata            Json     @default("{}")
+  created_at          DateTime @default(now())
+  completed_at        DateTime?
+
+  @@index([transaction_type])
+  @@index([status])
+  @@index([created_at])
+}
+
+model AuditLog {
+  id                  String   @id @default(cuid())
+  user_id             String?
+  user_type           String?
+  action              String
+  table_name          String
+  record_id           String?
+  before_value        Json?
+  after_value         Json?
+  ip_address          String?
+  user_agent          String?
+  reason              String?
+  created_at          DateTime @default(now())
+
+  @@index([user_id])
+  @@index([table_name])
+  @@index([action])
+  @@index([created_at])
+}
