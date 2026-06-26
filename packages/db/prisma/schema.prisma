@@ -18,7 +18,7 @@ model User {
   password_hash       String?
   auth_provider       String   @default("phone")
   firebase_uid        String?  @unique
-  user_type           String   // "customer" | "vendor" | "driver" | "admin"
+  user_type           String   // CUSTOMER | DRIVER | VENDOR_OWNER | VENDOR_STAFF | ADMIN | SUPER_ADMIN
   email_verified      Boolean  @default(false)
   email_verified_at   DateTime?
   phone_verified      Boolean  @default(false)
@@ -40,6 +40,7 @@ model User {
   customer            Customer?
   vendor              Vendor?
   driver              Driver?
+  refresh_tokens      RefreshToken[]
 
   @@index([email])
   @@index([phone])
@@ -499,6 +500,20 @@ model Transaction {
   @@index([transaction_type])
   @@index([status])
   @@index([created_at])
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  user_id     String
+  token_hash  String   @unique
+  expires_at  DateTime
+  revoked_at  DateTime?
+  created_at  DateTime @default(now())
+
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
 }
 
 model AuditLog {
