@@ -1,0 +1,29 @@
+{
+  "name": "kasieats",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "db:migrate": "yarn workspace @kasieats/db db:migrate",
+    "db:seed": "yarn workspace @kasieats/db db:seed",
+    "db:generate": "yarn workspace @kasieats/db db:generate"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "prettier": "^3.3.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "packageManager": "yarn@3.6.4",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
