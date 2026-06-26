@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "KasiEats",
+    "slug": "kasieats",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "kasieats",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "co.za.kasieats.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "co.za.kasieats.app"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
