@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding KasiEats database...');
+  console.log('Seeding MTHURA database (Nkanyezi Tech Solutions)...');
 
   const adminPassword = await bcrypt.hash('Admin123!', 10);
   const vendorPassword = await bcrypt.hash('Vendor123!', 10);
@@ -263,7 +263,7 @@ async function main() {
     },
   });
 
-  await prisma.driver.upsert({
+  const driver = await prisma.driver.upsert({
     where: { user_id: driverUser.id },
     update: {},
     create: {
@@ -280,7 +280,7 @@ async function main() {
     },
   });
 
-  // Seed active subscriptions for both vendors (R350/month — the only KasiEats revenue)
+  // Seed active subscriptions for both vendors (R150/month — MTHURA platform revenue)
   const subscriptionPeriodEnd = new Date();
   subscriptionPeriodEnd.setDate(subscriptionPeriodEnd.getDate() + 30);
 
@@ -294,7 +294,7 @@ async function main() {
         data: {
           vendor_id: seedVendor.id,
           status: 'active',
-          amount_zar: 350,
+          amount_zar: 150,
           current_period_start: new Date(),
           current_period_end: subscriptionPeriodEnd,
           last_payment_at: new Date(),
@@ -303,12 +303,31 @@ async function main() {
     }
   }
 
+  // Seed an active driver subscription (R80/month for 30 days — MTHURA platform revenue)
+  const existingDriverSub = await prisma.driverSubscription.findFirst({
+    where: { driver_id: driver.id },
+  });
+
+  if (!existingDriverSub) {
+    await prisma.driverSubscription.create({
+      data: {
+        driver_id: driver.id,
+        status: 'active',
+        amount_zar: 80,
+        current_period_start: new Date(),
+        current_period_end: subscriptionPeriodEnd,
+        last_payment_at: new Date(),
+      },
+    });
+  }
+
   console.log('Seed complete.');
   console.log(`Admin user: ${adminUser.phone}`);
   console.log(`Customer: ${customerUser.phone}`);
   console.log(`Vendor: ${vendor.store_name}`);
-  console.log('Note: Both vendors have active R350/month subscriptions (KasiEats revenue).');
-  console.log('Note: Food orders are paid by customers directly to vendors — KasiEats takes no cut.');
+  console.log('Note: Both vendors have active R150/month merchant subscriptions (MTHURA revenue).');
+  console.log('Note: The seed driver has an active R80/month subscription (MTHURA revenue).');
+  console.log('Note: Food orders are paid by customers to vendors via EFT + proof — MTHURA takes no cut.');
 }
 
 main()

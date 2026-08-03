@@ -11,15 +11,22 @@ export type OrderStatus =
   | 'cancelled'
   | 'rejected';
 
-// Orders are NOT processed through KasiEats payment — customers pay vendors directly.
-// payment_status is 'not_applicable' for all new orders.
+// Food orders use the MTHURA EFT proof-of-payment model — customers pay the
+// vendor via EFT and upload proof. MTHURA never processes food purchase funds.
 export type PaymentStatus =
   | 'not_applicable'
+  | 'awaiting_proof'
+  | 'proof_submitted'
+  | 'verified'
+  | 'rejected'
+  // legacy values retained for backwards compatibility
   | 'pending'
   | 'processing'
   | 'paid'
   | 'failed'
   | 'refunded';
+
+export type PaymentMethod = 'eft' | 'pay_vendor_directly' | 'cash';
 
 export type SubscriptionStatus =
   | 'trialing'
@@ -91,6 +98,11 @@ export interface CreateOrderItemInput {
   specialInstructions?: string;
 }
 
+export interface EftProofInput {
+  proofUrl: string;
+  reference?: string;
+}
+
 export interface CreateOrderInput {
   vendorId: string;
   items: CreateOrderItemInput[];
@@ -98,9 +110,9 @@ export interface CreateOrderInput {
   deliveryLatitude?: number;
   deliveryLongitude?: number;
   specialInstructions?: string;
-  // Customers pay vendors directly — KasiEats does not process food payments.
-  // 'cash' is accepted as a legacy alias for 'pay_vendor_directly'.
-  paymentMethod?: 'pay_vendor_directly' | 'cash';
+  // MTHURA launch model: customer pays the vendor via EFT and uploads proof.
+  // 'eft' is the default. 'pay_vendor_directly' / 'cash' are legacy aliases.
+  paymentMethod?: PaymentMethod;
 }
 
 export interface ApiResponse<T> {
@@ -131,8 +143,17 @@ export interface OrderDto {
   id: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  // Informational only — customer pays vendor directly
-  paymentMethod?: 'pay_vendor_directly' | 'cash' | string;
+  // MTHURA launch model — customer pays vendor via EFT + proof.
+  paymentMethod?: PaymentMethod | string;
+  // EFT proof-of-payment state
+  eftReference?: string | null;
+  eftProofUrl?: string | null;
+  eftProofUploadedAt?: string | null;
+  eftVerifiedAt?: string | null;
+  eftVerifiedByVendor?: boolean;
+  eftRejectionReason?: string | null;
+  // 4-digit delivery PIN generated after EFT verification / when ready
+  deliveryPin?: string | null;
   subtotal: number;
   deliveryFee: number;
   serviceFee: number;
@@ -179,9 +200,12 @@ export interface DeliveryJobDto {
 export interface AdminDashboardDto {
   totalOrders: number;
   ordersToday: number;
-  // Revenue from vendor subscription payments today (not order GMV)
+  // Total subscription revenue collected today (merchant + driver)
   revenueToday: number;
-  // GMV facilitated today (informational — not KasiEats revenue)
+  // Breakdown of subscription revenue today
+  merchantRevenueToday?: number;
+  driverRevenueToday?: number;
+  // GMV facilitated today (informational — not MTHURA revenue)
   gmvToday: number;
   activeVendors: number;
   pendingVendors: number;
@@ -193,6 +217,19 @@ export interface AdminDashboardDto {
 export interface SubscriptionDto {
   id: string;
   vendorId: string;
+  status: SubscriptionStatus;
+  amountZar: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEndsAt?: string | null;
+  cancelledAt?: string | null;
+  lastPaymentAt?: string | null;
+  createdAt: string;
+}
+
+export interface DriverSubscriptionDto {
+  id: string;
+  driverId: string;
   status: SubscriptionStatus;
   amountZar: number;
   currentPeriodStart: string;
