@@ -14,10 +14,14 @@ MTHURA is a **coordination marketplace**, not a payment processor for food order
 | Money flow | Who handles it |
 |---|---|
 | Food order totals, delivery tips | Customer → vendor via **EFT + uploaded proof** (bank-to-vendor, outside the app) |
-| Merchant subscription | **R150 / month** after a **30-day free trial** |
-| Driver subscription | **R80 / month** after a **30-day free trial** |
+| Merchant subscription | **R350 / month** after a **30-day free trial** |
+| Driver subscription | **R100 / month** after a **30-day free trial** |
 
-**Launch food payments = EFT + proof of payment.** The customer pays the vendor by EFT and uploads proof in-app; the merchant verifies before the kitchen starts. A 4-digit delivery PIN is generated on verification and confirmed by the driver on delivery. MTHURA **does not hold or process food purchase money** at launch and takes **no commission** on orders.
+> Pricing is canonical in [`docs/FINANCIAL_OPS_BLUEPRINT.md`](docs/FINANCIAL_OPS_BLUEPRINT.md). If any other file conflicts with R350/R100, the Financial Ops Blueprint wins.
+
+**Launch food payments = EFT + proof of payment (Model A).** The customer pays food + delivery to the vendor via a single EFT using a unique order reference; the merchant verifies before the kitchen starts. A 4-digit delivery PIN is generated on verification and confirmed by the driver on delivery. MTHURA **does not hold or process food purchase money** at launch and takes **no commission** on orders.
+
+**Grace period:** Merchants and drivers have a 7-day grace period after subscription expiry before access is revoked.
 
 Payment gateways (**Ozow**, PayFast, Yoco, etc.) are reserved for **platform subscriptions in the future** — they are **not** used for food checkout at launch. Today subscription billing runs through a sandbox mock flow.
 

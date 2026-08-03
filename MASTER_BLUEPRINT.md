@@ -98,7 +98,7 @@ Register → Verify OTP → Select Address → Google Maps Location
 ## 5. Merchant Journey
 
 ```
-Register → Business Verification → 30-day Trial → Subscription (R150/month)
+Register → Business Verification → 30-day Trial → Subscription (R350/month)
 → Dashboard → Upload Menu → Variants → Promotions
 → Accept Orders → Verify EFT → Release Order
 → Sales Analytics → Reviews → Reports
@@ -111,7 +111,7 @@ Register → Business Verification → 30-day Trial → Subscription (R150/month
 ```
 Register → Identity Verification → Vehicle Registration
 → 16+ years (bicycle delivery allowed)
-→ Subscription (R80/month)
+→ Subscription (R100/month)
 → Receive Jobs → Accept → Navigate → Arrive
 → Merchant Releases Order → Collect → Navigate → Deliver
 → PIN Verification → Receive Earnings
@@ -162,8 +162,8 @@ MTHURA **does not hold or process food purchase money** at launch. EFT happens b
 
 | Role | Fee |
 |---|---|
-| Merchant | **R150 / month** (after 30-day trial) |
-| Driver | **R80 / month** |
+| Merchant | **R350 / month** (after 30-day trial) |
+| Driver | **R100 / month** |
 
 ### Future gateways
 Ozow · PayFast · Yoco · Peach Payments · Apple Pay · Google Pay · Cash · Scan to Pay
@@ -200,10 +200,12 @@ Templates for: Customer · Merchant · Driver · Admin · OTP · Welcome · Subs
 
 ## 15. Revenue Model
 
+> **Supersede notice:** For all money amounts, grace periods, EFT flow, and subscription terms, the canonical source is [](docs/FINANCIAL_OPS_BLUEPRINT.md). Where this section conflicts with the Financial Ops Blueprint, the Financial Ops Blueprint wins.
+
 | Stream | Amount / notes |
 |---|---|
-| Merchant Subscription | **R150/month** |
-| Driver Subscription | **R80/month** |
+| Merchant Subscription | **R350/month** — see [Financial Ops Blueprint](docs/FINANCIAL_OPS_BLUEPRINT.md) |
+| Driver Subscription | **R100/month** — see [Financial Ops Blueprint](docs/FINANCIAL_OPS_BLUEPRINT.md) |
 | Featured Listings | Future |
 | Advertising | Future |
 | Delivery Margin | Future |
