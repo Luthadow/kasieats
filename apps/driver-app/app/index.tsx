@@ -153,7 +153,7 @@ export default function DriverHome() {
       </View>
 
       <View style={styles.subCard}>
-        <Text style={styles.subTitle}>MTHURA Driver Subscription — R80/month</Text>
+        <Text style={styles.subTitle}>MTHURA Driver Subscription — R100/month</Text>
         {subscription ? (
           <>
             <Text style={styles.subStatus}>
@@ -169,7 +169,7 @@ export default function DriverHome() {
                 disabled={paying}
               >
                 <Text style={styles.payBtnText}>
-                  {paying ? 'Processing…' : 'Pay R80 (sandbox)'}
+                  {paying ? 'Processing…' : 'Pay R100 (sandbox)'}
                 </Text>
               </Pressable>
             ) : null}
@@ -181,7 +181,7 @@ export default function DriverHome() {
             disabled={paying}
           >
             <Text style={styles.payBtnText}>
-              {paying ? 'Processing…' : 'Activate subscription — R80/month'}
+              {paying ? 'Processing…' : 'Activate subscription — R100/month'}
             </Text>
           </Pressable>
         )}

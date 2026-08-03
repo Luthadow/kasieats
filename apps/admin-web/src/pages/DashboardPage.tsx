@@ -20,18 +20,33 @@ export default function DashboardPage() {
   const cards: { label: string; value: string | number; note?: string }[] = [
     {
       label: 'Subscription revenue today',
-      value: `R${(data?.revenueToday ?? 0).toFixed(2)}`,
-      note: 'Merchant (R150) + Driver (R80) subscriptions',
+      value: `R${((data?.subscriptionRevenueToday ?? data?.revenueToday ?? 0)).toFixed(2)}`,
+      note: 'Merchant (R350) + Driver (R100) subscriptions',
     },
     {
       label: 'Merchant subscription revenue',
       value: `R${(data?.merchantRevenueToday ?? 0).toFixed(2)}`,
-      note: 'R150/month per merchant',
+      note: 'R350/month per merchant',
     },
     {
       label: 'Driver subscription revenue',
       value: `R${(data?.driverRevenueToday ?? 0).toFixed(2)}`,
-      note: 'R80/month per driver',
+      note: 'R100/month per driver',
+    },
+    {
+      label: 'Merchants due (≤7 days or past_due)',
+      value: data?.merchantsDue ?? 0,
+      note: 'Subscriptions ending within 7 days or overdue',
+    },
+    {
+      label: 'Drivers due (≤7 days or past_due)',
+      value: data?.driversDue ?? 0,
+      note: 'Subscriptions ending within 7 days or overdue',
+    },
+    {
+      label: 'Outstanding renewals',
+      value: data?.outstandingRenewals ?? 0,
+      note: 'Merchants + drivers needing renewal',
     },
     {
       label: 'GMV facilitated today',
@@ -52,9 +67,13 @@ export default function DashboardPage() {
       <div className="page-header">
         <h1>Dashboard</h1>
         <p>
-          Platform health at a glance. MTHURA earns R150/month per merchant and R80/month per
+          Platform health at a glance. MTHURA earns R350/month per merchant and R100/month per
           driver subscription. Food payments go directly to vendors via EFT — MTHURA does not
-          process food payments.
+          process food payments. See{' '}
+          <a href="https://github.com" target="_blank" rel="noreferrer">
+            Financial Ops Blueprint
+          </a>{' '}
+          for full revenue model.
         </p>
       </div>
 

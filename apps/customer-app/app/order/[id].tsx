@@ -32,7 +32,6 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [reviewed, setReviewed] = useState(false);
-  const [eftReference, setEftReference] = useState('');
   const [eftProofUrl, setEftProofUrl] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -91,7 +90,8 @@ export default function OrderDetailScreen() {
     try {
       await apiRequest(`/orders/${id}/eft-proof`, {
         method: 'POST',
-        ...json({ proofUrl: eftProofUrl.trim(), reference: eftReference.trim() || undefined }),
+        // Reference is pre-assigned at order creation — do not override
+        ...json({ proofUrl: eftProofUrl.trim() }),
       });
       await load();
       Alert.alert('Proof submitted', 'The vendor will verify your EFT payment shortly.');
@@ -144,7 +144,7 @@ export default function OrderDetailScreen() {
         </Text>
       </View>
 
-      {/* EFT payment status + proof upload (MTHURA launch payment model) */}
+      {/* EFT payment status + banking details + proof upload (MTHURA Model A) */}
       {order.paymentStatus && order.paymentStatus !== 'not_applicable' ? (
         <View style={styles.panel}>
           <View style={styles.payRow}>
@@ -154,21 +154,58 @@ export default function OrderDetailScreen() {
             </Text>
           </View>
 
-          {order.paymentStatus === 'awaiting_proof' || order.paymentStatus === 'rejected' ? (
-            <>
-              {order.paymentStatus === 'rejected' && order.eftRejectionReason ? (
-                <Text style={styles.rejectText}>Rejected: {order.eftRejectionReason}</Text>
+          {/* Merchant banking details for EFT transfer (Financial Ops Blueprint §Checkout) */}
+          {order.merchantBanking ? (
+            <View style={styles.bankingBox}>
+              <Text style={styles.bankingTitle}>Pay via EFT to this account</Text>
+              {order.merchantBanking.bankName ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Bank</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.bankName}</Text>
+                </View>
               ) : null}
+              {order.merchantBanking.accountHolder ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Account holder</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.accountHolder}</Text>
+                </View>
+              ) : null}
+              {order.merchantBanking.accountNumberMasked ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Account number</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.accountNumberMasked}</Text>
+                </View>
+              ) : null}
+              {order.merchantBanking.branchCode ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Branch code</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.branchCode}</Text>
+                </View>
+              ) : null}
+              {order.eftReference ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Reference</Text>
+                  <Text style={[styles.bankValue, styles.refValue]}>{order.eftReference}</Text>
+                </View>
+              ) : null}
+              <Text style={styles.bankNote}>
+                Include food + delivery (R{order.totalAmount.toFixed(2)}) in one EFT.
+                Use the reference above so the merchant can identify your payment.
+              </Text>
+            </View>
+          ) : order.eftReference ? (
+            <View style={styles.bankingBox}>
+              <Text style={styles.bankingTitle}>EFT Reference</Text>
+              <Text style={[styles.bankValue, styles.refValue]}>{order.eftReference}</Text>
+            </View>
+          ) : null}
+
+          {order.paymentStatus === 'awaiting_proof' ? (
+            <>
               <Text style={styles.payHint}>
-                Pay the vendor via EFT, then add your reference and a link to your proof of payment.
+                After making the EFT, upload your proof of payment below.
                 MTHURA does not process food payments.
               </Text>
-              <TextInput
-                style={styles.input}
-                value={eftReference}
-                onChangeText={setEftReference}
-                placeholder="EFT reference (optional)"
-              />
               <TextInput
                 style={styles.input}
                 value={eftProofUrl}
@@ -186,15 +223,26 @@ export default function OrderDetailScreen() {
             </>
           ) : null}
 
+          {order.paymentStatus === 'rejected' ? (
+            <>
+              {order.eftRejectionReason ? (
+                <Text style={styles.rejectText}>Rejected: {order.eftRejectionReason}</Text>
+              ) : null}
+              <Text style={styles.payHint}>
+                Your proof was rejected. Please contact the merchant or support.
+              </Text>
+            </>
+          ) : null}
+
           {order.paymentStatus === 'proof_submitted' ? (
             <Text style={styles.payHint}>
-              Proof submitted. Waiting for the vendor to verify your payment.
+              Proof submitted. Waiting for the merchant to confirm your payment.
             </Text>
           ) : null}
 
           {order.paymentStatus === 'verified' && order.deliveryPin ? (
             <View style={styles.pinBox}>
-              <Text style={styles.pinLabel}>Your delivery PIN</Text>
+              <Text style={styles.pinLabel}>Payment Confirmed · Delivery PIN</Text>
               <Text style={styles.pinValue}>{order.deliveryPin}</Text>
               <Text style={styles.payHint}>Share this PIN with the driver on arrival.</Text>
             </View>
@@ -367,4 +415,18 @@ const styles = StyleSheet.create({
   thanks: { textAlign: 'center', color: theme.success, fontWeight: '700', marginBottom: 12 },
   linkBtn: { alignItems: 'center', padding: 12, marginBottom: 24 },
   linkBtnText: { color: theme.brandDark, fontWeight: '700' },
+  bankingBox: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  bankingTitle: { fontWeight: '800', color: '#15803d', marginBottom: 8, fontSize: 13 },
+  bankRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  bankLabel: { color: '#4b5563', fontSize: 13 },
+  bankValue: { color: '#111827', fontWeight: '700', fontSize: 13 },
+  refValue: { color: '#166534', fontSize: 14, letterSpacing: 1 },
+  bankNote: { color: '#4b5563', fontSize: 12, marginTop: 8, lineHeight: 16 },
 });
