@@ -30,8 +30,10 @@ export default function DriverLogin() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Driver sign in</Text>
-      <Text style={styles.subtitle}>Log in to start accepting deliveries.</Text>
+      <Text style={styles.title}>MTHURA Driver</Text>
+      <Text style={styles.subtitle}>
+        Built for the Township Economy. Log in to start accepting deliveries.
+      </Text>
 
       <TextInput
         style={styles.input}

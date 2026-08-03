@@ -28,14 +28,14 @@ export default function LoginPage() {
     <div className="auth-screen">
       <form className="auth-card" onSubmit={submit}>
         <div className="auth-brand">
-          <span className="brand-mark">KE</span>
+          <span className="brand-mark">M</span>
           <div>
-            <strong>KasiEats</strong>
-            <p>Vendor Portal</p>
+            <strong>MTHURA</strong>
+            <p>Merchant Portal</p>
           </div>
         </div>
         <h1>Sign in</h1>
-        <p className="auth-sub">Manage your kitchen, menu and orders.</p>
+        <p className="auth-sub">Built for the Township Economy. Manage your kitchen, menu and orders.</p>
 
         <label>Phone or email</label>
         <input

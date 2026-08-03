@@ -15,7 +15,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: theme.cream },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'KasiEats Driver' }} />
+        <Stack.Screen name="index" options={{ title: 'MTHURA Driver' }} />
         <Stack.Screen name="login" options={{ title: 'Driver sign in' }} />
         <Stack.Screen name="delivery/[id]" options={{ title: 'Delivery' }} />
         <Stack.Screen name="earnings" options={{ title: 'My deliveries' }} />

@@ -28,14 +28,14 @@ export default function LoginPage() {
     <div className="auth-screen">
       <form className="auth-card" onSubmit={submit}>
         <div className="auth-brand">
-          <span className="brand-mark">KE</span>
+          <span className="brand-mark">M</span>
           <div>
-            <strong>KasiEats</strong>
+            <strong>MTHURA</strong>
             <p>Admin Console</p>
           </div>
         </div>
         <h1>Sign in</h1>
-        <p className="auth-sub">Approve vendors, drivers and monitor orders.</p>
+        <p className="auth-sub">Built for the Township Economy. Approve merchants, drivers and monitor orders.</p>
 
         <label>Email</label>
         <input

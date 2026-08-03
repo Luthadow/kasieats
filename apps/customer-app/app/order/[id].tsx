@@ -6,12 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { apiData, apiRequest, json } from '../../src/services/api';
 import { statusColor, theme } from '../../src/theme';
-import { ORDER_STATUS_LABELS, type OrderDto } from '@kasieats/shared';
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, type OrderDto } from '@kasieats/shared';
 
 const ACTIVE_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'en_route'];
 const CANCELLABLE = ['pending', 'accepted'];
@@ -31,6 +32,8 @@ export default function OrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [eftReference, setEftReference] = useState('');
+  const [eftProofUrl, setEftProofUrl] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -79,6 +82,26 @@ export default function OrderDetailScreen() {
     ]);
   };
 
+  const submitEftProof = async () => {
+    if (!eftProofUrl.trim()) {
+      Alert.alert('Proof required', 'Please add a link to your EFT proof of payment.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/orders/${id}/eft-proof`, {
+        method: 'POST',
+        ...json({ proofUrl: eftProofUrl.trim(), reference: eftReference.trim() || undefined }),
+      });
+      await load();
+      Alert.alert('Proof submitted', 'The vendor will verify your EFT payment shortly.');
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Could not submit proof');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitReview = async (rating: number) => {
     setBusy(true);
     try {
@@ -120,6 +143,64 @@ export default function OrderDetailScreen() {
           {ORDER_STATUS_LABELS[order.status] ?? order.status}
         </Text>
       </View>
+
+      {/* EFT payment status + proof upload (MTHURA launch payment model) */}
+      {order.paymentStatus && order.paymentStatus !== 'not_applicable' ? (
+        <View style={styles.panel}>
+          <View style={styles.payRow}>
+            <Text style={styles.sectionTitle}>Payment (EFT)</Text>
+            <Text style={styles.payStatus}>
+              {PAYMENT_STATUS_LABELS[order.paymentStatus] ?? order.paymentStatus}
+            </Text>
+          </View>
+
+          {order.paymentStatus === 'awaiting_proof' || order.paymentStatus === 'rejected' ? (
+            <>
+              {order.paymentStatus === 'rejected' && order.eftRejectionReason ? (
+                <Text style={styles.rejectText}>Rejected: {order.eftRejectionReason}</Text>
+              ) : null}
+              <Text style={styles.payHint}>
+                Pay the vendor via EFT, then add your reference and a link to your proof of payment.
+                MTHURA does not process food payments.
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={eftReference}
+                onChangeText={setEftReference}
+                placeholder="EFT reference (optional)"
+              />
+              <TextInput
+                style={styles.input}
+                value={eftProofUrl}
+                onChangeText={setEftProofUrl}
+                placeholder="Link to proof of payment (URL)"
+                autoCapitalize="none"
+              />
+              <Pressable
+                style={[styles.payBtn, busy && { opacity: 0.6 }]}
+                onPress={submitEftProof}
+                disabled={busy}
+              >
+                <Text style={styles.payBtnText}>{busy ? 'Submitting…' : 'Upload EFT proof'}</Text>
+              </Pressable>
+            </>
+          ) : null}
+
+          {order.paymentStatus === 'proof_submitted' ? (
+            <Text style={styles.payHint}>
+              Proof submitted. Waiting for the vendor to verify your payment.
+            </Text>
+          ) : null}
+
+          {order.paymentStatus === 'verified' && order.deliveryPin ? (
+            <View style={styles.pinBox}>
+              <Text style={styles.pinLabel}>Your delivery PIN</Text>
+              <Text style={styles.pinValue}>{order.deliveryPin}</Text>
+              <Text style={styles.payHint}>Share this PIN with the driver on arrival.</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       {order.status !== 'cancelled' && order.status !== 'rejected' ? (
         <View style={styles.panel}>
@@ -226,6 +307,37 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontWeight: '800', color: theme.text, marginBottom: 8 },
   body: { color: '#374151', fontSize: 15 },
+  payRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  payStatus: { fontWeight: '800', color: theme.brandDark },
+  payHint: { color: theme.muted, fontSize: 14, marginTop: 6, lineHeight: 19 },
+  rejectText: { color: theme.danger, fontWeight: '700', marginBottom: 4 },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    fontSize: 15,
+    color: theme.text,
+  },
+  payBtn: {
+    backgroundColor: theme.brand,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  payBtnText: { color: '#fff', fontWeight: '800' },
+  pinBox: {
+    backgroundColor: theme.brandTint,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  pinLabel: { color: theme.brandDark, fontWeight: '700' },
+  pinValue: { color: theme.brandDark, fontWeight: '800', fontSize: 32, letterSpacing: 4, marginTop: 4 },
   timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
   dot: {
     width: 14,

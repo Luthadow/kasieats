@@ -119,10 +119,11 @@ export default function DashboardPage() {
 
       {/* Subscription panel */}
       <div className="panel" style={{ marginBottom: 16 }}>
-        <h2>KasiEats Subscription — R350/month</h2>
+        <h2>MTHURA Merchant Subscription — R150/month</h2>
         <p style={{ color: '#666', marginBottom: 8 }}>
-          Your subscription gives customers access to your store. Food payments go directly to you
-          — KasiEats does not process food payments.
+          Your subscription gives customers access to your store (30-day free trial, then
+          R150/month). Customers pay you via EFT and upload proof — MTHURA does not process food
+          payments.
         </p>
         {subscription ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -136,13 +137,13 @@ export default function DashboardPage() {
               subscription.status === 'expired' ||
               subscription.status === 'trialing') && (
               <button className="btn-primary" onClick={paySubscription} disabled={paying}>
-                {paying ? 'Processing…' : 'Pay R350 with Ozow (sandbox)'}
+                {paying ? 'Processing…' : 'Pay R150 (sandbox)'}
               </button>
             )}
           </div>
         ) : (
           <button className="btn-primary" onClick={paySubscription} disabled={paying}>
-            {paying ? 'Processing…' : 'Activate subscription — R350/month'}
+            {paying ? 'Processing…' : 'Activate subscription — R150/month'}
           </button>
         )}
         {subMessage && (

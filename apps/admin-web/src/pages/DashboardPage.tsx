@@ -21,12 +21,22 @@ export default function DashboardPage() {
     {
       label: 'Subscription revenue today',
       value: `R${(data?.revenueToday ?? 0).toFixed(2)}`,
-      note: 'R350/month vendor subscriptions',
+      note: 'Merchant (R150) + Driver (R80) subscriptions',
+    },
+    {
+      label: 'Merchant subscription revenue',
+      value: `R${(data?.merchantRevenueToday ?? 0).toFixed(2)}`,
+      note: 'R150/month per merchant',
+    },
+    {
+      label: 'Driver subscription revenue',
+      value: `R${(data?.driverRevenueToday ?? 0).toFixed(2)}`,
+      note: 'R80/month per driver',
     },
     {
       label: 'GMV facilitated today',
       value: `R${(data?.gmvToday ?? 0).toFixed(2)}`,
-      note: 'Paid directly to vendors — not KasiEats revenue',
+      note: 'Paid to vendors via EFT — not MTHURA revenue',
     },
     { label: 'Orders facilitated today', value: data?.ordersToday ?? 0 },
     { label: 'Total orders facilitated', value: data?.totalOrders ?? 0 },
@@ -42,8 +52,9 @@ export default function DashboardPage() {
       <div className="page-header">
         <h1>Dashboard</h1>
         <p>
-          Platform health at a glance. KasiEats earns R350/month per vendor subscription.
-          Food payments go directly to vendors — KasiEats does not process food payments.
+          Platform health at a glance. MTHURA earns R150/month per merchant and R80/month per
+          driver subscription. Food payments go directly to vendors via EFT — MTHURA does not
+          process food payments.
         </p>
       </div>
 

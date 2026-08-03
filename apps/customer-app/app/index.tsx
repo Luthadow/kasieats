@@ -38,9 +38,9 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Township flavour, delivered</Text>
+        <Text style={styles.heroTitle}>MTHURA — Township flavour, delivered</Text>
         <Text style={styles.heroSubtitle}>
-          Kotas, shisanyama and home kitchens near you.
+          Built for the Township Economy. Kotas, shisanyama and home kitchens near you.
         </Text>
         <View style={styles.heroActions}>
           {user ? (

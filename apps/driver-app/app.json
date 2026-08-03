@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "KasiEats Driver",
-    "slug": "kasieats-driver",
+    "name": "MTHURA Driver",
+    "slug": "mthura-driver",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "kasieats-driver",
+    "scheme": "mthura-driver",
     "userInterfaceStyle": "light",
     "splash": {
       "resizeMode": "contain",

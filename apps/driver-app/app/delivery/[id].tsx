@@ -5,10 +5,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { apiData, apiRequest } from '../../src/services/api';
+import { apiData, apiRequest, json } from '../../src/services/api';
 import { theme } from '../../src/theme';
 import type { DeliveryJobDto } from '@kasieats/shared';
 
@@ -33,6 +34,7 @@ export default function DeliveryScreen() {
   const [delivery, setDelivery] = useState<DeliveryJobDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [pin, setPin] = useState('');
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -51,9 +53,16 @@ export default function DeliveryScreen() {
   );
 
   const advance = async (action: string) => {
+    if (action === 'deliver' && pin.trim().length !== 4) {
+      Alert.alert('PIN required', 'Ask the customer for their 4-digit delivery PIN.');
+      return;
+    }
     setBusy(true);
     try {
-      await apiRequest(`/deliveries/${id}/${action}`, { method: 'POST' });
+      await apiRequest(`/deliveries/${id}/${action}`, {
+        method: 'POST',
+        ...(action === 'deliver' ? json({ pin: pin.trim() }) : {}),
+      });
       await load();
       if (action === 'deliver') {
         Alert.alert('Delivered!', 'Nice work. Earnings added.', [
@@ -123,6 +132,21 @@ export default function DeliveryScreen() {
         })}
       </View>
 
+      {next?.action === 'deliver' ? (
+        <View style={styles.panel}>
+          <Text style={styles.label}>Delivery PIN</Text>
+          <Text style={styles.pinHint}>Ask the customer for their 4-digit delivery PIN.</Text>
+          <TextInput
+            style={styles.pinInput}
+            value={pin}
+            onChangeText={setPin}
+            placeholder="0000"
+            keyboardType="number-pad"
+            maxLength={4}
+          />
+        </View>
+      ) : null}
+
       {next ? (
         <Pressable
           style={[styles.actionBtn, busy && { opacity: 0.6 }]}
@@ -165,6 +189,18 @@ const styles = StyleSheet.create({
   dotDone: { backgroundColor: theme.brand, borderColor: theme.brand },
   stepLabel: { color: theme.muted },
   stepLabelDone: { color: theme.text, fontWeight: '700' },
+  pinHint: { color: theme.muted, fontSize: 13, marginTop: 2, marginBottom: 8 },
+  pinInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 22,
+    letterSpacing: 8,
+    textAlign: 'center',
+    color: theme.text,
+  },
   actionBtn: {
     backgroundColor: theme.brand,
     padding: 18,

@@ -1,20 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import type { OrderDto, OrderStatus } from '@kasieats/shared';
-import { ORDER_STATUS_LABELS } from '../types';
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../types';
 
 const ACTIVE = ['pending', 'accepted', 'preparing', 'ready'];
 
-// Next actions available per status. Endpoint = POST /orders/:id/<action>.
-const ACTIONS: Record<string, { action: string; label: string; kind?: 'danger' }[]> = {
-  pending: [
-    { action: 'accept', label: 'Accept' },
-    { action: 'reject', label: 'Reject', kind: 'danger' },
-  ],
-  accepted: [{ action: 'preparing', label: 'Start preparing' }],
-  preparing: [{ action: 'ready', label: 'Mark ready' }],
-  ready: [],
-};
+type OrderAction = { action: string; label: string; kind?: 'danger' };
+
+// Next order-status actions available per status. Endpoint = POST /orders/:id/<action>.
+// Accept is only offered once the EFT payment has been verified.
+function actionsFor(order: OrderDto): OrderAction[] {
+  switch (order.status) {
+    case 'pending':
+      return order.paymentStatus === 'verified'
+        ? [
+            { action: 'accept', label: 'Accept' },
+            { action: 'reject', label: 'Reject', kind: 'danger' },
+          ]
+        : [];
+    case 'accepted':
+      return [{ action: 'preparing', label: 'Start preparing' }];
+    case 'preparing':
+      return [{ action: 'ready', label: 'Mark ready' }];
+    default:
+      return [];
+  }
+}
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderDto[]>([]);
@@ -99,7 +110,11 @@ function OrderCard({
   busy: boolean;
   onAction: (id: string, action: string) => void;
 }) {
-  const actions = ACTIONS[order.status] ?? [];
+  const actions = actionsFor(order);
+  const paymentStatus = order.paymentStatus ?? 'not_applicable';
+  const awaitingVerification = ['proof_submitted', 'awaiting_proof'].includes(paymentStatus);
+  const showEft = paymentStatus !== 'not_applicable';
+
   return (
     <div className="panel order-card">
       <div className="order-card-head">
@@ -127,6 +142,56 @@ function OrderCard({
           </li>
         ))}
       </ul>
+
+      {showEft && (
+        <div className="eft-block" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #eee' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 600 }}>EFT payment</span>
+            <span>{PAYMENT_STATUS_LABELS[paymentStatus] ?? paymentStatus}</span>
+          </div>
+          {order.eftReference && (
+            <p style={{ color: '#666', margin: '4px 0' }}>Reference: {order.eftReference}</p>
+          )}
+          {order.eftProofUrl && (
+            <p style={{ margin: '4px 0' }}>
+              <a href={order.eftProofUrl} target="_blank" rel="noreferrer">
+                View proof of payment
+              </a>
+            </p>
+          )}
+          {paymentStatus === 'rejected' && order.eftRejectionReason && (
+            <p style={{ color: '#b91c1c', margin: '4px 0' }}>Rejected: {order.eftRejectionReason}</p>
+          )}
+          {order.deliveryPin && paymentStatus === 'verified' && (
+            <p style={{ margin: '4px 0', fontWeight: 700 }}>
+              Delivery PIN: <span style={{ letterSpacing: 2 }}>{order.deliveryPin}</span>
+            </p>
+          )}
+          {awaitingVerification && (
+            <div className="order-actions" style={{ marginTop: 8 }}>
+              <button
+                className="btn-primary"
+                disabled={busy || paymentStatus === 'awaiting_proof'}
+                title={
+                  paymentStatus === 'awaiting_proof'
+                    ? 'Waiting for the customer to upload EFT proof'
+                    : undefined
+                }
+                onClick={() => onAction(order.id, 'verify-eft')}
+              >
+                Verify payment
+              </button>
+              <button
+                className="btn-danger"
+                disabled={busy}
+                onClick={() => onAction(order.id, 'reject-eft')}
+              >
+                Reject proof
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="order-card-foot">
         <strong>Total R{order.totalAmount.toFixed(2)}</strong>

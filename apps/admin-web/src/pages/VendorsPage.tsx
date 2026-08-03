@@ -41,7 +41,7 @@ export default function VendorsPage() {
     <section>
       <div className="page-header">
         <h1>Vendors pending approval</h1>
-        <p>Review and approve new kitchens joining KasiEats.</p>
+        <p>Review and approve new kitchens joining MTHURA.</p>
       </div>
 
       {error && <div className="alert">{error}</div>}

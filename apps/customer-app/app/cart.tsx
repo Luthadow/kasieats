@@ -68,7 +68,7 @@ export default function CartScreen() {
 
     setPlacing(true);
     try {
-      await apiData<{ id: string }>('/orders', {
+      const created = await apiData<{ id: string }>('/orders', {
         method: 'POST',
         ...json({
           vendorId: cart.vendorId,
@@ -76,14 +76,14 @@ export default function CartScreen() {
           deliveryAddress: addressText,
           deliveryLatitude: selectedAddress?.latitude ?? undefined,
           deliveryLongitude: selectedAddress?.longitude ?? undefined,
-          paymentMethod: 'pay_vendor_directly',
+          paymentMethod: 'eft',
           specialInstructions: notes.trim() || undefined,
         }),
       });
 
       cart.clear();
-      Alert.alert('Order placed!', 'Track it in My Orders.', [
-        { text: 'View orders', onPress: () => router.replace('/orders') },
+      Alert.alert('Order placed!', 'Pay the vendor via EFT, then upload your proof of payment.', [
+        { text: 'Upload EFT proof', onPress: () => router.replace(`/order/${created.id}`) },
       ]);
     } catch (error) {
       Alert.alert('Could not place order', error instanceof Error ? error.message : 'Try again');
@@ -164,12 +164,12 @@ export default function CartScreen() {
         />
       )}
 
-      {/* Payment info — KasiEats does not process food payments */}
+      {/* Payment info — MTHURA does not process food payments */}
       <View style={styles.paymentNotice}>
-        <Text style={styles.paymentNoticeTitle}>Payment</Text>
+        <Text style={styles.paymentNoticeTitle}>Payment — EFT</Text>
         <Text style={styles.paymentNoticeText}>
-          You pay the vendor directly (cash or their preferred method). KasiEats does not process
-          food payments.
+          Pay the vendor via EFT, then upload proof. MTHURA does not process food payments. After
+          placing your order you&apos;ll add your EFT reference and proof for the vendor to verify.
         </Text>
       </View>
 

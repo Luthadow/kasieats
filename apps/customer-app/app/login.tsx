@@ -98,8 +98,10 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to KasiEats</Text>
-      <Text style={styles.subtitle}>Sign in with your South African mobile number.</Text>
+      <Text style={styles.title}>Welcome to MTHURA</Text>
+      <Text style={styles.subtitle}>
+        Built for the Township Economy. Sign in with your South African mobile number.
+      </Text>
 
       <TextInput
         style={styles.input}

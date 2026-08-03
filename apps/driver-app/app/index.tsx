@@ -13,13 +13,21 @@ import { Redirect, router, useFocusEffect } from 'expo-router';
 import { apiData, apiRequest, json } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 import { theme } from '../src/theme';
-import type { DeliveryJobDto } from '@kasieats/shared';
+import type { DeliveryJobDto, DriverSubscriptionDto } from '@kasieats/shared';
 
 // Default location (Rustenburg) — a real app would use GPS.
 const LAT = -25.6544;
 const LNG = 27.2389;
 
 const IN_PROGRESS = ['assigned', 'picked_up', 'en_route', 'arrived'];
+
+const SUB_STATUS_LABEL: Record<string, string> = {
+  trialing: 'Free Trial',
+  active: 'Active',
+  past_due: 'Payment Due',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+};
 
 export default function DriverHome() {
   const { token, user, hydrating, clearAuth } = useAuth();
@@ -28,6 +36,17 @@ export default function DriverHome() {
   const [active, setActive] = useState<DeliveryJobDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<DriverSubscriptionDto | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [subMessage, setSubMessage] = useState<string | null>(null);
+
+  const loadSubscription = useCallback(async () => {
+    if (!token) return;
+    const sub = await apiData<DriverSubscriptionDto | null>('/subscriptions/driver/me').catch(
+      () => null,
+    );
+    setSubscription(sub ?? null);
+  }, [token]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -39,10 +58,31 @@ export default function DriverHome() {
       ]);
       setJobs(available ?? []);
       setActive((mine ?? []).find((d) => IN_PROGRESS.includes(d.status)) ?? null);
+      await loadSubscription();
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, loadSubscription]);
+
+  const paySubscription = async () => {
+    setPaying(true);
+    setSubMessage(null);
+    try {
+      const checkout = await apiData<{ reference: string; amount: number }>(
+        '/subscriptions/driver/checkout',
+        { method: 'POST' },
+      );
+      await apiRequest(`/subscriptions/mock-checkout/${checkout.reference}/confirm`, {
+        method: 'POST',
+      });
+      setSubMessage(`Payment of R${checkout.amount} confirmed! Subscription activated.`);
+      await loadSubscription();
+    } catch (error) {
+      setSubMessage(error instanceof Error ? error.message : 'Payment failed');
+    } finally {
+      setPaying(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -110,6 +150,42 @@ export default function DriverHome() {
         <Pressable style={[styles.navBtn, styles.navBtnGhost]} onPress={() => clearAuth()}>
           <Text style={styles.navBtnGhostText}>Sign out</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.subCard}>
+        <Text style={styles.subTitle}>MTHURA Driver Subscription — R80/month</Text>
+        {subscription ? (
+          <>
+            <Text style={styles.subStatus}>
+              {SUB_STATUS_LABEL[subscription.status] ?? subscription.status}
+              {subscription.currentPeriodEnd
+                ? ` · until ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-ZA')}`
+                : ''}
+            </Text>
+            {['past_due', 'expired', 'trialing', 'cancelled'].includes(subscription.status) ? (
+              <Pressable
+                style={[styles.payBtn, paying && { opacity: 0.6 }]}
+                onPress={paySubscription}
+                disabled={paying}
+              >
+                <Text style={styles.payBtnText}>
+                  {paying ? 'Processing…' : 'Pay R80 (sandbox)'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
+        ) : (
+          <Pressable
+            style={[styles.payBtn, paying && { opacity: 0.6 }]}
+            onPress={paySubscription}
+            disabled={paying}
+          >
+            <Text style={styles.payBtnText}>
+              {paying ? 'Processing…' : 'Activate subscription — R80/month'}
+            </Text>
+          </Pressable>
+        )}
+        {subMessage ? <Text style={styles.subMessage}>{subMessage}</Text> : null}
       </View>
 
       {active ? (
@@ -188,6 +264,25 @@ const styles = StyleSheet.create({
   navBtnText: { color: theme.brandDark, fontWeight: '700' },
   navBtnGhost: { flex: 0, paddingHorizontal: 18 },
   navBtnGhostText: { color: theme.muted, fontWeight: '700' },
+  subCard: {
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  subTitle: { fontWeight: '800', color: theme.text },
+  subStatus: { color: theme.muted, marginTop: 6, fontWeight: '600' },
+  payBtn: {
+    backgroundColor: theme.brand,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  payBtnText: { color: '#fff', fontWeight: '800' },
+  subMessage: { marginTop: 8, color: theme.brandDark, fontWeight: '600' },
   activeBanner: {
     backgroundColor: '#0F172A',
     borderRadius: 14,

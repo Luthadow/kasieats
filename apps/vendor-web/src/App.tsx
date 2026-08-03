@@ -47,10 +47,10 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">KE</span>
+        <span className="brand-mark">M</span>
         <div>
-          <strong>KasiEats</strong>
-          <p>Vendor Portal</p>
+          <strong>MTHURA</strong>
+          <p>Merchant Portal</p>
         </div>
       </div>
       <nav>

@@ -10,6 +10,14 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   rejected: 'Rejected',
 };
 
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  not_applicable: 'Not applicable',
+  awaiting_proof: 'Awaiting EFT proof',
+  proof_submitted: 'Proof submitted',
+  verified: 'Payment verified',
+  rejected: 'Proof rejected',
+};
+
 export interface VendorProfile {
   id: string;
   storeName: string;
