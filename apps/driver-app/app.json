@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "MTHURA Driver",
+    "slug": "mthura-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "mthura-driver",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#E85D04"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "co.za.kasieats.driver"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E85D04"
+      },
+      "package": "co.za.kasieats.driver"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

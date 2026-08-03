@@ -12,7 +12,7 @@ datasource db {
 
 model User {
   id                  String   @id @default(cuid())
-  email               String   @unique
+  email               String?  @unique
   phone               String   @unique
   phone_country_code  String   @default("ZA")
   password_hash       String?
@@ -94,10 +94,12 @@ model Vendor {
   photo_urls                  String[] @default([])
   operating_hours             Json     @default("{\"monday\": {\"open\": \"08:00\", \"close\": \"18:00\"}}")
   is_open_now                 Boolean  @default(false)
-  commission_rate             Decimal  @default(15.00) @db.Decimal(5, 2)
+  commission_rate             Decimal  @default(0) @db.Decimal(5, 2) // unused — platform takes no order commission
+  // EFT banking details for Model A delivery fee settlement (Financial Ops Blueprint)
+  bank_name                   String?
   bank_account_holder         String?
   bank_account_number         String?
-  bank_code                   String?
+  bank_code                   String? // branch code
   tax_id                      String?
   id_document_url             String?
   id_document_verified        Boolean  @default(false)
@@ -108,7 +110,7 @@ model Vendor {
   approved_at                 DateTime?
   approved_by_admin_id        String?
   total_orders                Int      @default(0)
-  total_revenue               Decimal  @default(0) @db.Decimal(15, 2)
+  total_revenue               Decimal  @default(0) @db.Decimal(15, 2) // GMV tracking only, not platform revenue
   average_rating              Decimal  @default(0) @db.Decimal(3, 2)
   rating_count                Int      @default(0)
   created_at                  DateTime @default(now())
@@ -117,6 +119,7 @@ model Vendor {
   user                        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   menus                       Menu[]
   orders                      Order[]
+  subscriptions               VendorSubscription[]
 
   @@index([user_id])
   @@index([status])
@@ -169,6 +172,7 @@ model Driver {
 
   user                        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   deliveries                  Delivery[]
+  subscriptions               DriverSubscription[]
 
   @@index([user_id])
   @@index([status])
@@ -253,8 +257,16 @@ model Order {
   currency            String   @default("ZAR")
   commission_rate     Decimal? @db.Decimal(5, 2)
   vendor_payout       Decimal? @db.Decimal(10, 2)
-  payment_method      String
-  payment_status      String   @default("pending")
+  payment_method      String   @default("eft") // MTHURA launch model: customer pays vendor via EFT
+  payment_status      String   @default("awaiting_proof") // awaiting_proof|proof_submitted|verified|rejected|not_applicable
+  // EFT proof-of-payment (MTHURA launch payment model)
+  eft_reference          String?
+  eft_proof_url          String?
+  eft_proof_uploaded_at  DateTime?
+  eft_verified_at        DateTime?
+  eft_verified_by_vendor Boolean  @default(false)
+  eft_rejection_reason   String?
+  delivery_pin           String?  // 4-digit PIN generated after EFT verify / when ready
   status              String   @default("pending")
   delivery_address    String
   delivery_latitude   Decimal? @db.Decimal(10, 8)
@@ -519,4 +531,96 @@ model AuditLog {
   @@index([table_name])
   @@index([action])
   @@index([created_at])
+}
+
+// Merchant subscription billing — MTHURA platform revenue (R350/month, Financial Ops Blueprint §1)
+model VendorSubscription {
+  id                   String   @id @default(cuid())
+  vendor_id            String
+  status               String   @default("trialing") // trialing|active|past_due|cancelled|expired
+  amount_zar           Decimal  @default(350) @db.Decimal(10, 2)
+  currency             String   @default("ZAR")
+  current_period_start DateTime
+  current_period_end   DateTime
+  // grace_ends_at = current_period_end + 7 days (Financial Ops Blueprint §Grace Period)
+  grace_ends_at        DateTime?
+  trial_ends_at        DateTime?
+  cancelled_at         DateTime?
+  ozow_transaction_id  String?
+  last_payment_at      DateTime?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  vendor               Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  payments             SubscriptionPayment[]
+
+  @@index([vendor_id])
+  @@index([status])
+  @@index([current_period_end])
+  @@index([grace_ends_at])
+}
+
+model SubscriptionPayment {
+  id                    String   @id @default(cuid())
+  subscription_id       String
+  amount_zar            Decimal  @db.Decimal(10, 2)
+  currency              String   @default("ZAR")
+  status                String   @default("pending") // pending|paid|failed
+  gateway               String   @default("ozow") // ozow | mock_ozow
+  transaction_reference String?  @unique
+  paid_at               DateTime?
+  failure_reason        String?
+  raw_callback          Json?
+  created_at            DateTime @default(now())
+
+  subscription          VendorSubscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@index([subscription_id])
+  @@index([status])
+}
+
+// Driver subscription billing — MTHURA platform revenue (R100/month, Financial Ops Blueprint §2)
+model DriverSubscription {
+  id                   String   @id @default(cuid())
+  driver_id            String
+  status               String   @default("trialing") // trialing|active|past_due|cancelled|expired
+  amount_zar           Decimal  @default(100) @db.Decimal(10, 2)
+  currency             String   @default("ZAR")
+  current_period_start DateTime
+  current_period_end   DateTime
+  // grace_ends_at = current_period_end + 7 days (Financial Ops Blueprint §Grace Period)
+  grace_ends_at        DateTime?
+  trial_ends_at        DateTime?
+  cancelled_at         DateTime?
+  ozow_transaction_id  String?
+  last_payment_at      DateTime?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  driver               Driver   @relation(fields: [driver_id], references: [id], onDelete: Cascade)
+  payments             DriverSubscriptionPayment[]
+
+  @@index([driver_id])
+  @@index([status])
+  @@index([current_period_end])
+  @@index([grace_ends_at])
+}
+
+model DriverSubscriptionPayment {
+  id                    String   @id @default(cuid())
+  subscription_id       String
+  amount_zar            Decimal  @db.Decimal(10, 2)
+  currency              String   @default("ZAR")
+  status                String   @default("pending") // pending|paid|failed
+  gateway               String   @default("ozow") // ozow | mock_ozow
+  transaction_reference String?  @unique
+  paid_at               DateTime?
+  failure_reason        String?
+  raw_callback          Json?
+  created_at            DateTime @default(now())
+
+  subscription          DriverSubscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@index([subscription_id])
+  @@index([status])
 }

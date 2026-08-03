@@ -1,317 +1,171 @@
-# KasiEats Monorepo
+# MTHURA
 
-**Building South Africa's largest township food delivery platform.**
+**Built for the Township Economy**
+Powered by **Nkanyezi Tech Solutions (Pty) Ltd** · HQ Rustenburg, North West, South Africa
 
-## Quick Start
+MTHURA is a township-first digital commerce platform connecting customers with local businesses through a modern marketplace, delivery network, and business operating system. Food delivery is the **first vertical**; the long-term vision is to become the digital infrastructure for South Africa's township economy.
+
+> Canonical product source of truth: [`MASTER_BLUEPRINT.md`](./MASTER_BLUEPRINT.md). The older `COMPANY_CONSTITUTION.md`, `ARCHITECTURE_BLUEPRINT.md` and `docs/PRD.md` (KasiEats draft) are retained for historical reference only.
+
+## Business model
+
+MTHURA is a **coordination marketplace**, not a payment processor for food orders. Platform revenue comes exclusively from subscriptions.
+
+| Money flow | Who handles it |
+|---|---|
+| Food order totals, delivery tips | Customer → vendor via **EFT + uploaded proof** (bank-to-vendor, outside the app) |
+| Merchant subscription | **R350 / month** after a **30-day free trial** |
+| Driver subscription | **R100 / month** after a **30-day free trial** |
+
+> Pricing is canonical in [`docs/FINANCIAL_OPS_BLUEPRINT.md`](docs/FINANCIAL_OPS_BLUEPRINT.md). If any other file conflicts with R350/R100, the Financial Ops Blueprint wins.
+
+**Launch food payments = EFT + proof of payment (Model A).** The customer pays food + delivery to the vendor via a single EFT using a unique order reference; the merchant verifies before the kitchen starts. A 4-digit delivery PIN is generated on verification and confirmed by the driver on delivery. MTHURA **does not hold or process food purchase money** at launch and takes **no commission** on orders.
+
+**Grace period:** Merchants and drivers have a 7-day grace period after subscription expiry before access is revoked.
+
+Payment gateways (**Ozow**, PayFast, Yoco, etc.) are reserved for **platform subscriptions in the future** — they are **not** used for food checkout at launch. Today subscription billing runs through a sandbox mock flow.
+
+## Services
+
+| Service | URL | Description |
+|---|---|---|
+| API | http://localhost:3000 | NestJS REST API |
+| API Docs | http://localhost:3000/api/docs | Swagger UI |
+| Vendor Web | http://localhost:3001 | Vendor dashboard (React/Vite) |
+| Admin Web | http://localhost:3002 | Admin dashboard (React/Vite) |
+| RabbitMQ | http://localhost:15672 | Message broker UI |
+
+## Quick Start (local dev)
 
 ### Prerequisites
-- Node.js 18+
-- Yarn 3.6+
+
+- Node.js 20+
+- Yarn 1.22
 - Docker & Docker Compose
-- PostgreSQL 15+ (or use Docker)
-- Redis 7+ (or use Docker)
 
 ### Setup
 
 ```bash
-# 1. Clone and install
-git clone https://github.com/Luthadow/kasieats.git
-cd kasieats
-yarn install
-
-# 2. Start local services
-docker-compose up -d
-
-# 3. Setup database
-yarn workspace @kasieats/db db:migrate
-yarn workspace @kasieats/db db:seed
-
-# 4. Start all services
-yarn dev
-
-# 5. Services now running:
-# - API: http://localhost:3000
-# - Customer App: Expo dev server (Ctrl+J in terminal)
-# - Vendor Web: http://localhost:3001
-# - Admin Web: http://localhost:3002
-# - PostgreSQL: localhost:5432
-# - Redis: localhost:6379
-# - RabbitMQ Management: http://localhost:15672
+bash scripts/dev-up.sh
 ```
 
----
+This script:
+1. Copies `.env.example` to `apps/api/.env.local` if not present
+2. Starts postgres, redis, rabbitmq via Docker
+3. Runs `yarn install`
+4. Builds shared packages and generates the Prisma client
+5. Runs database migrations
+6. Seeds the database
 
-## Project Structure
+Then start the API in watch mode:
+
+```bash
+yarn workspace @kasieats/api dev
+```
+
+Or run all services with turbo:
+
+```bash
+yarn dev
+```
+
+### Seed credentials
+
+| Role | Login | Password / OTP |
+|---|---|---|
+| Admin | `admin@kasieats.co.za` | `Admin123!` |
+| Vendor | `+27831234567` | `Vendor123!` |
+| Driver | `+27851234567` | `Driver123!` |
+| Customer | `+27761234567` | OTP `123456` (dev) |
+
+Dev OTP for any phone is always `123456` when `NODE_ENV !== production`.
+
+## Full Stack with Docker Compose
+
+Build and run all services (API + frontends + infra):
+
+```bash
+docker compose up --build
+```
+
+Production mode (no exposed infra ports, restart:always):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+### Useful commands
+
+```bash
+yarn docker:up        # docker compose up -d (all services)
+yarn docker:down      # docker compose down
+yarn dev:infra        # start only postgres/redis/rabbitmq
+yarn smoke            # run smoke tests against localhost
+```
+
+## Architecture
 
 ```
 kasieats/
 ├── apps/
-│   ├── api/                    # NestJS backend (the "nervous system")
-│   │   ├── src/
-│   │   │   ├── auth/           # Authentication service
-│   │   │   ├── vendors/        # Vendor service
-│   │   │   ├── orders/         # Order service
-│   │   │   ├── payments/       # Payment service
-│   │   │   ├── deliveries/     # Delivery service
-│   │   │   ├── users/          # User service
-│   │   │   ├── notifications/  # Notification service
-│   │   │   ├── admin/          # Admin service
-│   │   │   ├── common/         # Shared utilities
-│   │   │   └── main.ts         # Entry point
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   └── README.md
-│   │
-│   ├── customer-app/           # React Native customer app
-│   │   ├── src/
-│   │   │   ├── screens/
-│   │   │   ├── components/
-│   │   │   ├── services/       # API client
-│   │   │   ├── context/        # State management
-│   │   │   └── App.tsx
-│   │   ├── app.json            # Expo config
-│   │   └── package.json
-│   │
-│   ├── driver-app/             # React Native driver app
-│   │   └── (similar structure to customer-app)
-│   │
-│   ├── vendor-web/             # React vendor dashboard
-│   │   ├── src/
-│   │   │   ├── pages/
-│   │   │   ├── components/
-│   │   │   └── App.tsx
-│   │   ├── vite.config.ts
-│   │   └── package.json
-│   │
-│   └── admin-web/              # React admin dashboard
-│       └── (similar to vendor-web)
-│
+│   ├── api/            # NestJS backend — REST API on :3000
+│   ├── vendor-web/     # React/Vite vendor dashboard — :3001
+│   ├── admin-web/      # React/Vite admin dashboard  — :3002
+│   ├── customer-app/   # Expo customer mobile app
+│   └── driver-app/     # Expo driver mobile app
 ├── packages/
-│   ├── db/                     # Prisma schema & migrations
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma
-│   │   │   └── migrations/
-│   │   ├── scripts/
-│   │   │   ├── migrate.ts
-│   │   │   └── seed.ts
-│   │   └── package.json
-│   │
-│   └── shared/                 # TypeScript types & utilities
-│       ├── src/
-│       │   ├── types/
-│       │   ├── utils/
-│       │   ├── constants/
-│       │   └── index.ts
-│       └── package.json
-│
-├── docs/
-│   ├── COMPANY_CONSTITUTION.md
-│   ├── DATABASE_BIBLE.md
-│   ├── ARCHITECTURE_BLUEPRINT.md
-│   └── MASTER_BLUEPRINT.md
-│
-├── docker-compose.yml          # Local dev environment
-├── package.json                # Root workspace config
-├── turbo.json                  # Turbo config
-├── tsconfig.json               # TypeScript config
-├── .eslintrc.json              # ESLint config
-├── .prettierrc                 # Prettier config
-└── README.md                   # This file
+│   ├── shared/         # Shared TypeScript types and utilities
+│   └── db/             # Prisma schema, migrations, seed script
+├── scripts/
+│   ├── dev-up.sh       # Local dev bootstrap
+│   └── smoke-test.sh   # Basic API smoke tests
+└── docker-compose.yml  # Full stack compose
 ```
 
----
-
-## Commands
-
-### Development
-
-```bash
-# Start all services in parallel
-yarn dev
-
-# Start specific service
-yarn workspace @kasieats/api dev
-yarn workspace @kasieats/customer-app dev
-yarn workspace @kasieats/vendor-web dev
-
-# Watch mode for development
-yarn build --watch
-```
-
-### Testing
-
-```bash
-# Run all tests
-yarn test
-
-# Run tests for specific workspace
-yarn workspace @kasieats/api test
-
-# Run with coverage
-yarn test -- --coverage
-```
-
-### Linting & Formatting
-
-```bash
-# Lint all code
-yarn lint
-
-# Format all code
-yarn format
-
-# Check formatting without changes
-yarn format --check
-```
-
-### Database
-
-```bash
-# Run migrations
-yarn db:migrate
-
-# Seed database with test data
-yarn db:seed
-
-# Reset database (careful!)
-yarn workspace @kasieats/db db:reset
-```
-
-### Building
-
-```bash
-# Build all apps
-yarn build
-
-# Build specific app
-yarn workspace @kasieats/api build
-```
-
----
+**Tech stack:** NestJS · Prisma · PostgreSQL (PostGIS) · Redis · RabbitMQ · React · Vite · Expo · Docker
 
 ## Environment Variables
 
-### Local Development
+Copy `.env.example` to `.env.local` (root) or `apps/api/.env.local` and update values.
 
-Create `.env.local` files in each app:
+Key variables:
 
-**apps/api/.env.local**
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | postgres://… | PostgreSQL connection string |
+| `REDIS_URL` | redis://… | Redis connection string |
+| `JWT_SECRET` | — | **Must change in production** |
+| `SMS_PROVIDER` | `console` | `console` (dev) or `twilio` |
+| `PAYMENT_MODE` | `sandbox` | Platform subscription billing only (`sandbox` or `ozow`). Not used for food checkout. |
+| `OZOW_MERCHANT_ID` | — | Ozow merchant id (reserved for subscriptions — use secrets, not chat) |
+| `OZOW_PRIVATE_KEY` | — | Ozow private key (never commit) |
+| `CORS_ORIGIN` | localhost:3001,3002 | Comma-separated allowed origins |
+
+## Database
+
+```bash
+yarn db:generate          # regenerate Prisma client after schema changes
+yarn db:migrate           # create + apply a new migration (dev)
+yarn db:migrate:deploy    # apply pending migrations (CI/prod)
+yarn db:seed              # seed with demo data
 ```
-NODE_ENV=development
-DATABASE_URL=postgresql://kasieats_user:kasieats_password@localhost:5432/kasieats
-REDIS_URL=redis://localhost:6379
-RABBITMQ_URL=amqp://kasieats_user:kasieats_password@localhost:5672
-JWT_SECRET=your-secret-key-here
-PAYSTACK_SECRET_KEY=sk_test_xxx
-OZOW_API_KEY=test_api_key
-GOOGLE_MAPS_API_KEY=your_maps_key
-FIREBASE_PROJECT_ID=kasieats-dev
-```
 
-**apps/customer-app/.env**
-```
-EXPO_PUBLIC_API_URL=http://localhost:3000
-EXPO_PUBLIC_ENVIRONMENT=development
-```
+## CI
 
----
+GitHub Actions runs on every push/PR to `main`:
+- Build `@kasieats/shared` and `@kasieats/db`
+- Lint + build + test the API
+- Build vendor-web and admin-web
 
-## Tech Stack
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| **Mobile** | React Native + Expo | Single codebase iOS/Android |
-| **Backend** | NestJS + TypeScript | Production-grade, scalable |
-| **Database** | PostgreSQL + PostGIS | Relational + geospatial |
-| **Cache** | Redis | Real-time tracking, sessions |
-| **Message Queue** | RabbitMQ | Async processing, notifications |
-| **Storage** | Google Cloud Storage | Scalable image storage |
-| **Payments** | Ozow, Yoco, Peach | South Africa-native providers |
-| **Maps** | Google Maps API | Navigation, geolocation |
-| **Hosting** | Google Cloud Platform | Auto-scaling, managed services |
-
----
-
-## API Documentation
-
-Full OpenAPI documentation available at `/api/docs` (when running locally).
-
-**Key Endpoints:**
-- `POST /auth/register` – Register new user
-- `POST /auth/login` – Login
-- `GET /vendors` – Get nearby vendors
-- `POST /orders` – Create order
-- `GET /orders/{id}` – Track order
-- `PATCH /deliveries/{id}/status` – Update delivery status
-- `GET /admin/dashboard` – Admin metrics
-
-See `ARCHITECTURE_BLUEPRINT.md` for complete API design.
-
----
-
-## Development Workflow
-
-1. **Create feature branch**: `git checkout -b feat/your-feature`
-2. **Make changes** in relevant app/package
-3. **Write tests**: Aim for 80%+ coverage
-4. **Run locally**: `yarn dev`
-5. **Lint & format**: `yarn lint && yarn format`
-6. **Commit**: `git commit -am "feat: describe change"`
-7. **Push**: `git push origin feat/your-feature`
-8. **Create PR**: Link related issues
-9. **CI runs**: Tests, lint, build checks
-10. **Merge**: Require 2 approvals on main
-
----
+See `.github/workflows/ci.yml`.
 
 ## Deployment
 
-### Staging (Automatic)
-- Every push to `main` triggers deploy to staging
-- Test in `kasieats-staging` GCP project
-- Accessible at `https://staging.kasieats.co.za`
+The `deploy-staging.yml` workflow builds Docker images and echoes deploy steps targeting GCP Cloud Run. Configure these secrets in GitHub Settings → Secrets → Actions to activate:
 
-### Production (Manual)
-- Tagged releases only: `git tag v1.0.0`
-- Blue-green deployment
-- Requires 2 approvals
-- Automatic rollback on health check failure
-- Production: `https://api.kasieats.co.za`
-
----
-
-## Monitoring & Observability
-
-- **Logs**: Cloud Logging (ELK stack)
-- **Metrics**: Cloud Monitoring + Prometheus
-- **Tracing**: Cloud Trace
-- **Alerts**: PagerDuty on critical issues
-
-Dashboard: https://console.cloud.google.com/monitoring
-
----
-
-## Getting Help
-
-1. Check `docs/` folder for detailed guides
-2. Check service README.md files
-3. Open an issue on GitHub
-4. Ask in Slack #kasieats-engineering
-
----
-
-## Contributing
-
-See CONTRIBUTING.md for detailed guidelines.
-
----
-
-## License
-
-MIT
-
----
-
-**Let's build the township economy's super-app. 🚀**
-
-*For the full blueprint and company documentation, see `/docs`*
+- `GCP_PROJECT_ID`
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_SERVICE_ACCOUNT`
+- `STAGING_API_URL`
+- `STAGING_DATABASE_URL`
+- `STAGING_JWT_SECRET`

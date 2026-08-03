@@ -1,0 +1,432 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { apiData, apiRequest, json } from '../../src/services/api';
+import { statusColor, theme } from '../../src/theme';
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, type OrderDto } from '@kasieats/shared';
+
+const ACTIVE_STATUSES = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'en_route'];
+const CANCELLABLE = ['pending', 'accepted'];
+
+const TIMELINE: { key: string; label: string }[] = [
+  { key: 'pending', label: 'Order placed' },
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'preparing', label: 'Preparing' },
+  { key: 'ready', label: 'Ready' },
+  { key: 'en_route', label: 'On the way' },
+  { key: 'delivered', label: 'Delivered' },
+];
+
+export default function OrderDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [order, setOrder] = useState<OrderDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [reviewed, setReviewed] = useState(false);
+  const [eftProofUrl, setEftProofUrl] = useState('');
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    try {
+      const data = await apiData<OrderDto>(`/orders/${id}`);
+      setOrder(data);
+    } catch {
+      // ignore transient errors
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    load();
+    pollRef.current = setInterval(() => {
+      setOrder((current) => {
+        if (!current || ACTIVE_STATUSES.includes(current.status)) load();
+        return current;
+      });
+    }, 10000);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [load]);
+
+  const cancelOrder = () => {
+    Alert.alert('Cancel order?', 'This cannot be undone.', [
+      { text: 'Keep order', style: 'cancel' },
+      {
+        text: 'Cancel order',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await apiRequest(`/orders/${id}/cancel`, { method: 'POST' });
+            await load();
+          } catch (error) {
+            Alert.alert('Error', error instanceof Error ? error.message : 'Could not cancel');
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const submitEftProof = async () => {
+    if (!eftProofUrl.trim()) {
+      Alert.alert('Proof required', 'Please add a link to your EFT proof of payment.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiRequest(`/orders/${id}/eft-proof`, {
+        method: 'POST',
+        // Reference is pre-assigned at order creation — do not override
+        ...json({ proofUrl: eftProofUrl.trim() }),
+      });
+      await load();
+      Alert.alert('Proof submitted', 'The vendor will verify your EFT payment shortly.');
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Could not submit proof');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitReview = async (rating: number) => {
+    setBusy(true);
+    try {
+      await apiRequest('/reviews', {
+        method: 'POST',
+        ...json({ orderId: id, vendorRating: rating, driverRating: rating, comment: 'Great order!' }),
+      });
+      setReviewed(true);
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Could not submit review');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={theme.brand} />
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={styles.center}>
+        <Text>Order not found</Text>
+      </View>
+    );
+  }
+
+  const currentIndex = TIMELINE.findIndex((t) => t.key === order.status);
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+      <View style={styles.headerRow}>
+        <Text style={styles.store}>{order.vendor.storeName}</Text>
+        <Text style={[styles.status, { color: statusColor[order.status] ?? theme.muted }]}>
+          {ORDER_STATUS_LABELS[order.status] ?? order.status}
+        </Text>
+      </View>
+
+      {/* EFT payment status + banking details + proof upload (MTHURA Model A) */}
+      {order.paymentStatus && order.paymentStatus !== 'not_applicable' ? (
+        <View style={styles.panel}>
+          <View style={styles.payRow}>
+            <Text style={styles.sectionTitle}>Payment (EFT)</Text>
+            <Text style={styles.payStatus}>
+              {PAYMENT_STATUS_LABELS[order.paymentStatus] ?? order.paymentStatus}
+            </Text>
+          </View>
+
+          {/* Merchant banking details for EFT transfer (Financial Ops Blueprint §Checkout) */}
+          {order.merchantBanking ? (
+            <View style={styles.bankingBox}>
+              <Text style={styles.bankingTitle}>Pay via EFT to this account</Text>
+              {order.merchantBanking.bankName ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Bank</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.bankName}</Text>
+                </View>
+              ) : null}
+              {order.merchantBanking.accountHolder ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Account holder</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.accountHolder}</Text>
+                </View>
+              ) : null}
+              {order.merchantBanking.accountNumberMasked ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Account number</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.accountNumberMasked}</Text>
+                </View>
+              ) : null}
+              {order.merchantBanking.branchCode ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Branch code</Text>
+                  <Text style={styles.bankValue}>{order.merchantBanking.branchCode}</Text>
+                </View>
+              ) : null}
+              {order.eftReference ? (
+                <View style={styles.bankRow}>
+                  <Text style={styles.bankLabel}>Reference</Text>
+                  <Text style={[styles.bankValue, styles.refValue]}>{order.eftReference}</Text>
+                </View>
+              ) : null}
+              <Text style={styles.bankNote}>
+                Include food + delivery (R{order.totalAmount.toFixed(2)}) in one EFT.
+                Use the reference above so the merchant can identify your payment.
+              </Text>
+            </View>
+          ) : order.eftReference ? (
+            <View style={styles.bankingBox}>
+              <Text style={styles.bankingTitle}>EFT Reference</Text>
+              <Text style={[styles.bankValue, styles.refValue]}>{order.eftReference}</Text>
+            </View>
+          ) : null}
+
+          {order.paymentStatus === 'awaiting_proof' ? (
+            <>
+              <Text style={styles.payHint}>
+                After making the EFT, upload your proof of payment below.
+                MTHURA does not process food payments.
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={eftProofUrl}
+                onChangeText={setEftProofUrl}
+                placeholder="Link to proof of payment (URL)"
+                autoCapitalize="none"
+              />
+              <Pressable
+                style={[styles.payBtn, busy && { opacity: 0.6 }]}
+                onPress={submitEftProof}
+                disabled={busy}
+              >
+                <Text style={styles.payBtnText}>{busy ? 'Submitting…' : 'Upload EFT proof'}</Text>
+              </Pressable>
+            </>
+          ) : null}
+
+          {order.paymentStatus === 'rejected' ? (
+            <>
+              {order.eftRejectionReason ? (
+                <Text style={styles.rejectText}>Rejected: {order.eftRejectionReason}</Text>
+              ) : null}
+              <Text style={styles.payHint}>
+                Your proof was rejected. Please contact the merchant or support.
+              </Text>
+            </>
+          ) : null}
+
+          {order.paymentStatus === 'proof_submitted' ? (
+            <Text style={styles.payHint}>
+              Proof submitted. Waiting for the merchant to confirm your payment.
+            </Text>
+          ) : null}
+
+          {order.paymentStatus === 'verified' && order.deliveryPin ? (
+            <View style={styles.pinBox}>
+              <Text style={styles.pinLabel}>Payment Confirmed · Delivery PIN</Text>
+              <Text style={styles.pinValue}>{order.deliveryPin}</Text>
+              <Text style={styles.payHint}>Share this PIN with the driver on arrival.</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {order.status !== 'cancelled' && order.status !== 'rejected' ? (
+        <View style={styles.panel}>
+          {TIMELINE.map((step, i) => {
+            const done = currentIndex >= 0 && i <= currentIndex;
+            return (
+              <View key={step.key} style={styles.timelineRow}>
+                <View style={[styles.dot, done && styles.dotDone]} />
+                <Text style={[styles.timelineLabel, done && styles.timelineLabelDone]}>
+                  {step.label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {order.delivery?.driver ? (
+        <View style={styles.panel}>
+          <Text style={styles.sectionTitle}>Your driver</Text>
+          <Text style={styles.body}>
+            {order.delivery.driver.name} · ★ {order.delivery.driver.rating}
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={styles.panel}>
+        <Text style={styles.sectionTitle}>Items</Text>
+        {order.items.map((item, i) => (
+          <View key={i} style={styles.itemRow}>
+            <Text style={styles.body}>
+              {item.quantity}× {item.name}
+            </Text>
+            <Text style={styles.body}>R{(item.pricePerItem * item.quantity).toFixed(2)}</Text>
+          </View>
+        ))}
+        <View style={styles.divider} />
+        <View style={styles.itemRow}>
+          <Text style={styles.body}>Delivery</Text>
+          <Text style={styles.body}>R{order.deliveryFee.toFixed(2)}</Text>
+        </View>
+        <View style={styles.itemRow}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalLabel}>R{order.totalAmount.toFixed(2)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.panel}>
+        <Text style={styles.sectionTitle}>Delivery address</Text>
+        <Text style={styles.body}>{order.deliveryAddress}</Text>
+      </View>
+
+      {CANCELLABLE.includes(order.status) ? (
+        <Pressable style={styles.cancelBtn} onPress={cancelOrder} disabled={busy}>
+          <Text style={styles.cancelBtnText}>Cancel order</Text>
+        </Pressable>
+      ) : null}
+
+      {order.status === 'delivered' && !reviewed ? (
+        <View style={styles.panel}>
+          <Text style={styles.sectionTitle}>Rate your order</Text>
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <Pressable key={n} onPress={() => submitReview(n)} disabled={busy}>
+                <Text style={styles.star}>★</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {reviewed ? <Text style={styles.thanks}>Thanks for your feedback! 🎉</Text> : null}
+
+      <Pressable style={styles.linkBtn} onPress={() => router.replace('/orders')}>
+        <Text style={styles.linkBtnText}>Back to orders</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.cream },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.cream,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  store: { fontSize: 20, fontWeight: '800', color: theme.text, flex: 1 },
+  status: { fontWeight: '800', fontSize: 14 },
+  panel: {
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  sectionTitle: { fontWeight: '800', color: theme.text, marginBottom: 8 },
+  body: { color: '#374151', fontSize: 15 },
+  payRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  payStatus: { fontWeight: '800', color: theme.brandDark },
+  payHint: { color: theme.muted, fontSize: 14, marginTop: 6, lineHeight: 19 },
+  rejectText: { color: theme.danger, fontWeight: '700', marginBottom: 4 },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    fontSize: 15,
+    color: theme.text,
+  },
+  payBtn: {
+    backgroundColor: theme.brand,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  payBtnText: { color: '#fff', fontWeight: '800' },
+  pinBox: {
+    backgroundColor: theme.brandTint,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  pinLabel: { color: theme.brandDark, fontWeight: '700' },
+  pinValue: { color: theme.brandDark, fontWeight: '800', fontSize: 32, letterSpacing: 4, marginTop: 4 },
+  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
+  dot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: theme.border,
+    backgroundColor: '#fff',
+  },
+  dotDone: { backgroundColor: theme.brand, borderColor: theme.brand },
+  timelineLabel: { color: theme.muted },
+  timelineLabelDone: { color: theme.text, fontWeight: '700' },
+  itemRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  divider: { height: 1, backgroundColor: theme.border, marginVertical: 8 },
+  totalLabel: { fontWeight: '800', color: theme.text, fontSize: 16 },
+  cancelBtn: {
+    borderWidth: 1,
+    borderColor: theme.danger,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cancelBtnText: { color: theme.danger, fontWeight: '800' },
+  starsRow: { flexDirection: 'row', gap: 8 },
+  star: { fontSize: 34, color: theme.brand },
+  thanks: { textAlign: 'center', color: theme.success, fontWeight: '700', marginBottom: 12 },
+  linkBtn: { alignItems: 'center', padding: 12, marginBottom: 24 },
+  linkBtnText: { color: theme.brandDark, fontWeight: '700' },
+  bankingBox: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  bankingTitle: { fontWeight: '800', color: '#15803d', marginBottom: 8, fontSize: 13 },
+  bankRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  bankLabel: { color: '#4b5563', fontSize: 13 },
+  bankValue: { color: '#111827', fontWeight: '700', fontSize: 13 },
+  refValue: { color: '#166534', fontSize: 14, letterSpacing: 1 },
+  bankNote: { color: '#4b5563', fontSize: 12, marginTop: 8, lineHeight: 16 },
+});

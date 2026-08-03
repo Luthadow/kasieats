@@ -1,0 +1,31 @@
+# Production overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Changes from base:
+#   - restart: always on all services
+#   - No host ports for postgres/redis/rabbitmq (internal only)
+#   - API, vendor-web, admin-web remain exposed on host
+
+services:
+  postgres:
+    restart: always
+    ports: []  # no host port in prod
+
+  redis:
+    restart: always
+    ports: []
+
+  rabbitmq:
+    restart: always
+    ports: []  # management UI not exposed in prod
+
+  api:
+    restart: always
+    environment:
+      NODE_ENV: production
+
+  vendor-web:
+    restart: always
+
+  admin-web:
+    restart: always
