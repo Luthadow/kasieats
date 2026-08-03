@@ -1,11 +1,13 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CompleteProfileDto {
-  @ApiProperty()
+  @ApiProperty({
+    description: 'Short-lived profile token issued by verify-otp when needsProfile is true.',
+  })
   @IsString()
   @IsNotEmpty()
-  userId!: string;
+  profileToken!: string;
 
   @ApiProperty({ example: 'Amahle' })
   @IsString()
@@ -16,4 +18,9 @@ export class CompleteProfileDto {
   @IsString()
   @MinLength(2)
   lastName!: string;
+
+  @ApiPropertyOptional({ example: 'amahle@example.com' })
+  @IsOptional()
+  @IsString()
+  email?: string;
 }

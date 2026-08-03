@@ -4,7 +4,9 @@ import { AuthService } from './auth.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { LoginDto } from './dto/login.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Public } from '../common/decorators/public.decorator';
 import type { AuthenticatedRequest } from './types';
 
 @ApiTags('auth')
@@ -12,19 +14,28 @@ import type { AuthenticatedRequest } from './types';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post('send-otp')
   sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto);
   }
 
+  @Public()
   @Post('verify-otp')
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto);
   }
 
+  @Public()
   @Post('complete-profile')
-  completeProfile(@Body() dto: CompleteProfileDto & { userId: string }) {
-    return this.authService.completeProfile(dto.userId, dto);
+  completeProfile(@Body() dto: CompleteProfileDto) {
+    return this.authService.completeProfile(dto);
+  }
+
+  @Public()
+  @Post('login')
+  login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
   }
 
   @Get('me')

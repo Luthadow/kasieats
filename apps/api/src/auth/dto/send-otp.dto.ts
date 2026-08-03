@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import type { UserType } from '@kasieats/shared';
 
 export class SendOtpDto {
   @ApiProperty({ example: '0761234567' })
@@ -9,4 +10,12 @@ export class SendOtpDto {
     message: 'Enter a valid South African mobile number',
   })
   phone!: string;
+
+  @ApiPropertyOptional({
+    enum: ['customer', 'vendor', 'driver'],
+    description: 'Onboarding context for a new user. Defaults to customer.',
+  })
+  @IsOptional()
+  @IsIn(['customer', 'vendor', 'driver'])
+  userType?: Exclude<UserType, 'admin'>;
 }
