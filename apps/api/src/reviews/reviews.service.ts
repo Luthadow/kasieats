@@ -44,7 +44,7 @@ export class ReviewsService {
         reviewee_type: 'vendor',
         vendor_id: order.vendor_id,
         rating: dto.vendorRating,
-        comment: dto.vendorComment,
+        comment: dto.vendorComment ?? dto.comment,
       },
     });
     await this.applyRating('vendor', order.vendor_id, dto.vendorRating);

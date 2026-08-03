@@ -30,12 +30,16 @@ export class VendorsService {
       orderBy: [{ average_rating: 'desc' }, { total_orders: 'desc' }],
     });
 
+    const latitude = query.latitude ?? query.lat;
+    const longitude = query.longitude ?? query.lng;
+    const maxDistanceKm = query.maxDistanceKm ?? query.radiusKm;
+
     const withDistance = vendors.map((vendor) => {
       const distanceKm =
-        query.latitude !== undefined && query.longitude !== undefined
+        latitude !== undefined && longitude !== undefined
           ? haversineKm(
-              query.latitude,
-              query.longitude,
+              latitude,
+              longitude,
               Number(vendor.latitude),
               Number(vendor.longitude),
             )
@@ -62,9 +66,9 @@ export class VendorsService {
     });
 
     const filtered =
-      query.maxDistanceKm !== undefined
+      maxDistanceKm !== undefined
         ? withDistance.filter(
-            (v) => v.distanceKm === undefined || v.distanceKm <= query.maxDistanceKm!,
+            (v) => v.distanceKm === undefined || v.distanceKm <= maxDistanceKm!,
           )
         : withDistance;
 

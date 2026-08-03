@@ -48,14 +48,14 @@ yarn dev
 
 ### Seed credentials
 
-All accounts use OTP `123456` in development (`SMS_PROVIDER=console`).
+| Role | Login | Password / OTP |
+|---|---|---|
+| Admin | `admin@kasieats.co.za` | `Admin123!` |
+| Vendor | `+27831234567` | `Vendor123!` |
+| Driver | `+27851234567` | `Driver123!` |
+| Customer | `+27761234567` | OTP `123456` (dev) |
 
-| Role | Phone / Email |
-|---|---|
-| Admin | admin@kasieats.co.za |
-| Vendor | vendor@kasieats.co.za |
-| Driver | driver@kasieats.co.za |
-| Customer | customer@kasieats.co.za |
+Dev OTP for any phone is always `123456` when `NODE_ENV !== production`.
 
 ## Full Stack with Docker Compose
 
@@ -88,7 +88,8 @@ kasieats/
 │   ├── api/            # NestJS backend — REST API on :3000
 │   ├── vendor-web/     # React/Vite vendor dashboard — :3001
 │   ├── admin-web/      # React/Vite admin dashboard  — :3002
-│   └── customer-app/   # Expo mobile app (iOS/Android)
+│   ├── customer-app/   # Expo customer mobile app
+│   └── driver-app/     # Expo driver mobile app
 ├── packages/
 │   ├── shared/         # Shared TypeScript types and utilities
 │   └── db/             # Prisma schema, migrations, seed script

@@ -84,7 +84,7 @@ export default function OrderDetailScreen() {
     try {
       await apiRequest('/reviews', {
         method: 'POST',
-        ...json({ orderId: id, vendorRating: rating }),
+        ...json({ orderId: id, vendorRating: rating, driverRating: rating, comment: 'Great order!' }),
       });
       setReviewed(true);
     } catch (error) {
