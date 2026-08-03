@@ -1,8 +1,16 @@
-export const PLATFORM_COMMISSION_RATE = 0.15;
+// KasiEats takes NO cut of food orders.
+// The only money KasiEats collects is the vendor subscription of R350/month.
+// These rates are kept at 0 for informational/legacy reasons only.
+export const PLATFORM_COMMISSION_RATE = 0; // unused — platform takes no order commission
+export const SERVICE_FEE_RATE = 0; // unused — no service fee on orders
 
+// Vendor subscription billing (the only KasiEats revenue)
+export const VENDOR_SUBSCRIPTION_FEE_ZAR = 350;
+export const VENDOR_SUBSCRIPTION_PERIOD_DAYS = 30;
+export const VENDOR_TRIAL_PERIOD_DAYS = 7;
+
+// Informational suggested delivery amount — customer pays vendor/driver directly
 export const DEFAULT_DELIVERY_FEE_ZAR = 25;
-
-export const SERVICE_FEE_RATE = 0.05;
 
 export const OTP_EXPIRY_SECONDS = 60;
 

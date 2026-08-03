@@ -11,7 +11,22 @@ export type OrderStatus =
   | 'cancelled'
   | 'rejected';
 
-export type PaymentStatus = 'pending' | 'processing' | 'paid' | 'failed' | 'refunded';
+// Orders are NOT processed through KasiEats payment — customers pay vendors directly.
+// payment_status is 'not_applicable' for all new orders.
+export type PaymentStatus =
+  | 'not_applicable'
+  | 'pending'
+  | 'processing'
+  | 'paid'
+  | 'failed'
+  | 'refunded';
+
+export type SubscriptionStatus =
+  | 'trialing'
+  | 'active'
+  | 'past_due'
+  | 'cancelled'
+  | 'expired';
 
 export type DeliveryStatus =
   | 'assigned'
@@ -83,7 +98,9 @@ export interface CreateOrderInput {
   deliveryLatitude?: number;
   deliveryLongitude?: number;
   specialInstructions?: string;
-  paymentMethod: 'card' | 'cash';
+  // Customers pay vendors directly — KasiEats does not process food payments.
+  // 'cash' is accepted as a legacy alias for 'pay_vendor_directly'.
+  paymentMethod?: 'pay_vendor_directly' | 'cash';
 }
 
 export interface ApiResponse<T> {
@@ -114,7 +131,8 @@ export interface OrderDto {
   id: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  paymentMethod?: 'card' | 'cash';
+  // Informational only — customer pays vendor directly
+  paymentMethod?: 'pay_vendor_directly' | 'cash' | string;
   subtotal: number;
   deliveryFee: number;
   serviceFee: number;
@@ -161,10 +179,26 @@ export interface DeliveryJobDto {
 export interface AdminDashboardDto {
   totalOrders: number;
   ordersToday: number;
+  // Revenue from vendor subscription payments today (not order GMV)
   revenueToday: number;
+  // GMV facilitated today (informational — not KasiEats revenue)
+  gmvToday: number;
   activeVendors: number;
   pendingVendors: number;
   activeDrivers: number;
   pendingDrivers: number;
   totalCustomers: number;
+}
+
+export interface SubscriptionDto {
+  id: string;
+  vendorId: string;
+  status: SubscriptionStatus;
+  amountZar: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEndsAt?: string | null;
+  cancelledAt?: string | null;
+  lastPaymentAt?: string | null;
+  createdAt: string;
 }

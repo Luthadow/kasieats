@@ -10,13 +10,11 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { apiData, apiRequest, json } from '../src/services/api';
+import { apiData, json } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 import { useCart } from '../src/context/CartContext';
 import { theme } from '../src/theme';
 import type { AddressDto } from '@kasieats/shared';
-
-type PaymentMethod = 'cash' | 'card';
 
 export default function CartScreen() {
   const { token } = useAuth();
@@ -24,7 +22,6 @@ export default function CartScreen() {
   const [addresses, setAddresses] = useState<AddressDto[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [manualAddress, setManualAddress] = useState('');
-  const [payment, setPayment] = useState<PaymentMethod>('cash');
   const [notes, setNotes] = useState('');
   const [placing, setPlacing] = useState(false);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
@@ -71,7 +68,7 @@ export default function CartScreen() {
 
     setPlacing(true);
     try {
-      const order = await apiData<{ id: string }>('/orders', {
+      await apiData<{ id: string }>('/orders', {
         method: 'POST',
         ...json({
           vendorId: cart.vendorId,
@@ -79,14 +76,10 @@ export default function CartScreen() {
           deliveryAddress: addressText,
           deliveryLatitude: selectedAddress?.latitude ?? undefined,
           deliveryLongitude: selectedAddress?.longitude ?? undefined,
-          paymentMethod: payment,
+          paymentMethod: 'pay_vendor_directly',
           specialInstructions: notes.trim() || undefined,
         }),
       });
-
-      if (payment === 'card') {
-        await payWithCard(order.id);
-      }
 
       cart.clear();
       Alert.alert('Order placed!', 'Track it in My Orders.', [
@@ -97,15 +90,6 @@ export default function CartScreen() {
     } finally {
       setPlacing(false);
     }
-  };
-
-  const payWithCard = async (orderId: string) => {
-    const init = await apiData<{ paymentUrl: string; reference: string }>(
-      `/payments/orders/${orderId}/initiate`,
-      { method: 'POST' },
-    );
-    // Mock gateway: confirm immediately for the MVP loop.
-    await apiRequest(`/payments/mock-checkout/${init.reference}/confirm`, { method: 'POST' });
   };
 
   if (cart.count === 0) {
@@ -180,19 +164,13 @@ export default function CartScreen() {
         />
       )}
 
-      <Text style={styles.sectionLabel}>Payment</Text>
-      <View style={styles.payRow}>
-        {(['cash', 'card'] as PaymentMethod[]).map((method) => (
-          <Pressable
-            key={method}
-            style={[styles.payChip, payment === method && styles.payChipOn]}
-            onPress={() => setPayment(method)}
-          >
-            <Text style={[styles.payChipText, payment === method && styles.payChipTextOn]}>
-              {method === 'cash' ? 'Cash on delivery' : 'Card (mock)'}
-            </Text>
-          </Pressable>
-        ))}
+      {/* Payment info — KasiEats does not process food payments */}
+      <View style={styles.paymentNotice}>
+        <Text style={styles.paymentNoticeTitle}>Payment</Text>
+        <Text style={styles.paymentNoticeText}>
+          You pay the vendor directly (cash or their preferred method). KasiEats does not process
+          food payments.
+        </Text>
       </View>
 
       <Text style={styles.sectionLabel}>Notes for the kitchen (optional)</Text>
@@ -205,7 +183,7 @@ export default function CartScreen() {
 
       <View style={styles.summary}>
         <Row label="Subtotal" value={`R${cart.subtotal.toFixed(2)}`} />
-        <Row label="Delivery fee" value={`R${deliveryFee.toFixed(2)}`} />
+        <Row label="Suggested delivery (pay driver)" value={`R${deliveryFee.toFixed(2)}`} />
         <Row label="Total" value={`R${total.toFixed(2)}`} bold />
       </View>
 
@@ -286,19 +264,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.text,
   },
-  payRow: { flexDirection: 'row', gap: 10 },
-  payChip: {
-    flex: 1,
+  paymentNotice: {
+    backgroundColor: '#f0f9ff',
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: '#bae6fd',
     borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    padding: 14,
+    marginTop: 16,
+    marginBottom: 4,
   },
-  payChipOn: { borderColor: theme.brand, backgroundColor: theme.brandTint },
-  payChipText: { fontWeight: '700', color: theme.muted },
-  payChipTextOn: { color: theme.brandDark },
+  paymentNoticeTitle: {
+    fontWeight: '800',
+    color: theme.text,
+    marginBottom: 4,
+  },
+  paymentNoticeText: {
+    color: '#0369a1',
+    fontSize: 14,
+    lineHeight: 20,
+  },
   summary: {
     backgroundColor: theme.card,
     borderRadius: 14,

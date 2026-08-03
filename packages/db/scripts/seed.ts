@@ -87,6 +87,7 @@ async function main() {
       longitude: 27.241,
       is_open_now: true,
       status: 'active',
+      commission_rate: 0,
       approved_at: new Date(),
       average_rating: 4.8,
       rating_count: 42,
@@ -178,6 +179,7 @@ async function main() {
       longitude: 27.255,
       is_open_now: true,
       status: 'active',
+      commission_rate: 0,
       approved_at: new Date(),
       average_rating: 4.5,
       rating_count: 18,
@@ -278,10 +280,35 @@ async function main() {
     },
   });
 
+  // Seed active subscriptions for both vendors (R350/month — the only KasiEats revenue)
+  const subscriptionPeriodEnd = new Date();
+  subscriptionPeriodEnd.setDate(subscriptionPeriodEnd.getDate() + 30);
+
+  for (const seedVendor of [vendor, vendor2]) {
+    const existingSub = await prisma.vendorSubscription.findFirst({
+      where: { vendor_id: seedVendor.id },
+    });
+
+    if (!existingSub) {
+      await prisma.vendorSubscription.create({
+        data: {
+          vendor_id: seedVendor.id,
+          status: 'active',
+          amount_zar: 350,
+          current_period_start: new Date(),
+          current_period_end: subscriptionPeriodEnd,
+          last_payment_at: new Date(),
+        },
+      });
+    }
+  }
+
   console.log('Seed complete.');
   console.log(`Admin user: ${adminUser.phone}`);
   console.log(`Customer: ${customerUser.phone}`);
   console.log(`Vendor: ${vendor.store_name}`);
+  console.log('Note: Both vendors have active R350/month subscriptions (KasiEats revenue).');
+  console.log('Note: Food orders are paid by customers directly to vendors — KasiEats takes no cut.');
 }
 
 main()

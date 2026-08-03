@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   async getDashboard() {
@@ -19,6 +21,7 @@ export class AdminService {
       vendors,
       drivers,
       ordersToday,
+      gmvToday,
       revenueToday,
       pendingVendors,
       pendingDrivers,
@@ -27,9 +30,15 @@ export class AdminService {
       this.prisma.vendor.count(),
       this.prisma.driver.count(),
       this.prisma.order.count({ where: { created_at: { gte: startOfToday } } }),
+      // GMV facilitated today (informational — not KasiEats revenue)
       this.prisma.order.aggregate({
         _sum: { total_amount: true },
         where: { created_at: { gte: startOfToday }, status: 'delivered' },
+      }),
+      // Actual KasiEats revenue: subscription payments paid today
+      this.prisma.subscriptionPayment.aggregate({
+        _sum: { amount_zar: true },
+        where: { paid_at: { gte: startOfToday }, status: 'paid' },
       }),
       this.prisma.vendor.count({ where: { status: 'pending_approval' } }),
       this.prisma.driver.count({ where: { status: 'pending_approval' } }),
@@ -42,7 +51,10 @@ export class AdminService {
         vendors,
         drivers,
         ordersToday,
-        revenueToday: Number(revenueToday._sum.total_amount ?? 0),
+        // Subscription revenue collected today
+        revenueToday: Number(revenueToday._sum.amount_zar ?? 0),
+        // GMV (order totals) facilitated today — customers pay vendors directly
+        gmvToday: Number(gmvToday._sum.total_amount ?? 0),
         pendingApprovals: {
           vendors: pendingVendors,
           drivers: pendingDrivers,
@@ -91,9 +103,12 @@ export class AdminService {
     await this.notifications.createNotification(
       vendor.user_id,
       'Store approved',
-      'Congratulations! Your store has been approved and is now live.',
+      'Congratulations! Your store has been approved and is now live. You have a 7-day free trial subscription.',
       'vendor_approved',
     );
+
+    // Create 7-day trial subscription for newly approved vendor
+    await this.subscriptions.createTrialSubscription(vendor.id);
 
     return { success: true, data: { id: updated.id, status: updated.status } };
   }

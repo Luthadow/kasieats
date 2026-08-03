@@ -81,7 +81,10 @@ export class CreateOrderDto {
   @IsString()
   specialInstructions?: string;
 
-  @ApiProperty({ enum: ['card', 'cash'] })
-  @IsEnum(['card', 'cash'])
-  paymentMethod!: 'card' | 'cash';
+  // Customers pay vendors directly — KasiEats does not process food payments.
+  // 'cash' is accepted as a legacy alias for 'pay_vendor_directly'.
+  @ApiPropertyOptional({ enum: ['pay_vendor_directly', 'cash'] })
+  @IsOptional()
+  @IsEnum(['pay_vendor_directly', 'cash'])
+  paymentMethod?: 'pay_vendor_directly' | 'cash';
 }

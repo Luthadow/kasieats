@@ -200,8 +200,8 @@ export class DeliveriesService {
     const now = new Date();
     const driverEarned =
       Math.round(Number(order.delivery_fee) * DRIVER_EARNINGS_SHARE * 100) / 100;
-    const isCash = order.payment_method === 'cash';
 
+    // Driver payment is arranged directly between driver and customer/vendor outside platform
     const operations: Prisma.PrismaPromise<unknown>[] = [
       this.prisma.delivery.update({
         where: { id: delivery.id },
@@ -210,7 +210,7 @@ export class DeliveriesService {
           delivered_at: now,
           actual_delivery_time: now,
           driver_earned: driverEarned,
-          driver_payment_status: isCash ? 'collected' : 'pending',
+          driver_payment_status: 'external', // arranged outside platform
         },
       }),
       this.prisma.order.update({
@@ -218,7 +218,7 @@ export class DeliveriesService {
         data: {
           status: 'delivered',
           delivered_at: now,
-          ...(isCash && { payment_status: 'paid' }),
+          // payment_status stays 'not_applicable' — no platform payment
         },
       }),
       this.prisma.driver.update({
@@ -233,7 +233,8 @@ export class DeliveriesService {
         where: { id: order.vendor_id },
         data: {
           total_orders: { increment: 1 },
-          total_revenue: { increment: order.vendor_payout ?? order.subtotal },
+          // total_revenue is GMV tracking only — not platform revenue
+          total_revenue: { increment: order.subtotal },
         },
       }),
       this.prisma.customer.update({
@@ -246,15 +247,6 @@ export class DeliveriesService {
         },
       }),
     ];
-
-    if (isCash) {
-      operations.push(
-        this.prisma.payment.updateMany({
-          where: { order_id: order.id },
-          data: { status: 'paid', processed_at: now },
-        }),
-      );
-    }
 
     await this.prisma.$transaction(operations);
 

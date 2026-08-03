@@ -9,7 +9,7 @@ import { VendorsModule } from './vendors/vendors.module';
 import { OrdersModule } from './orders/orders.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { DeliveriesModule } from './deliveries/deliveries.module';
-import { PaymentsModule } from './payments/payments.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { AdminModule } from './admin/admin.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -28,7 +28,7 @@ import { HealthModule } from './health/health.module';
     OrdersModule,
     AddressesModule,
     DeliveriesModule,
-    PaymentsModule,
+    SubscriptionsModule,
     AdminModule,
     NotificationsModule,
     ReviewsModule,

@@ -94,7 +94,7 @@ model Vendor {
   photo_urls                  String[] @default([])
   operating_hours             Json     @default("{\"monday\": {\"open\": \"08:00\", \"close\": \"18:00\"}}")
   is_open_now                 Boolean  @default(false)
-  commission_rate             Decimal  @default(15.00) @db.Decimal(5, 2)
+  commission_rate             Decimal  @default(0) @db.Decimal(5, 2) // unused — platform takes no order commission
   bank_account_holder         String?
   bank_account_number         String?
   bank_code                   String?
@@ -108,7 +108,7 @@ model Vendor {
   approved_at                 DateTime?
   approved_by_admin_id        String?
   total_orders                Int      @default(0)
-  total_revenue               Decimal  @default(0) @db.Decimal(15, 2)
+  total_revenue               Decimal  @default(0) @db.Decimal(15, 2) // GMV tracking only, not platform revenue
   average_rating              Decimal  @default(0) @db.Decimal(3, 2)
   rating_count                Int      @default(0)
   created_at                  DateTime @default(now())
@@ -117,6 +117,7 @@ model Vendor {
   user                        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   menus                       Menu[]
   orders                      Order[]
+  subscriptions               VendorSubscription[]
 
   @@index([user_id])
   @@index([status])
@@ -253,8 +254,8 @@ model Order {
   currency            String   @default("ZAR")
   commission_rate     Decimal? @db.Decimal(5, 2)
   vendor_payout       Decimal? @db.Decimal(10, 2)
-  payment_method      String
-  payment_status      String   @default("pending")
+  payment_method      String   @default("pay_vendor_directly") // customers pay vendors directly
+  payment_status      String   @default("not_applicable") // orders have no platform payment
   status              String   @default("pending")
   delivery_address    String
   delivery_latitude   Decimal? @db.Decimal(10, 8)
@@ -519,4 +520,47 @@ model AuditLog {
   @@index([table_name])
   @@index([action])
   @@index([created_at])
+}
+
+// Vendor subscription billing — the only money KasiEats collects (R350/month)
+model VendorSubscription {
+  id                   String   @id @default(cuid())
+  vendor_id            String
+  status               String   @default("trialing") // trialing|active|past_due|cancelled|expired
+  amount_zar           Decimal  @default(350) @db.Decimal(10, 2)
+  currency             String   @default("ZAR")
+  current_period_start DateTime
+  current_period_end   DateTime
+  trial_ends_at        DateTime?
+  cancelled_at         DateTime?
+  ozow_transaction_id  String?
+  last_payment_at      DateTime?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  vendor               Vendor   @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  payments             SubscriptionPayment[]
+
+  @@index([vendor_id])
+  @@index([status])
+  @@index([current_period_end])
+}
+
+model SubscriptionPayment {
+  id                    String   @id @default(cuid())
+  subscription_id       String
+  amount_zar            Decimal  @db.Decimal(10, 2)
+  currency              String   @default("ZAR")
+  status                String   @default("pending") // pending|paid|failed
+  gateway               String   @default("ozow") // ozow | mock_ozow
+  transaction_reference String?  @unique
+  paid_at               DateTime?
+  failure_reason        String?
+  raw_callback          Json?
+  created_at            DateTime @default(now())
+
+  subscription          VendorSubscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@index([subscription_id])
+  @@index([status])
 }

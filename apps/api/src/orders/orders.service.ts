@@ -6,8 +6,6 @@ import {
 } from '@nestjs/common';
 import {
   DEFAULT_DELIVERY_FEE_ZAR,
-  PLATFORM_COMMISSION_RATE,
-  SERVICE_FEE_RATE,
 } from '@kasieats/shared';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
@@ -41,6 +39,9 @@ export class OrdersService {
     if (!vendor || vendor.status !== 'active') {
       throw new NotFoundException('Vendor not available');
     }
+
+    // Require vendor to have an active or trialing subscription
+    await this.assertVendorHasActiveSubscription(vendor.id);
 
     // Deduplicate menu item ids for validation lookup.
     const uniqueMenuItemIds = [...new Set(dto.items.map((i) => i.menuItemId))];
@@ -78,11 +79,14 @@ export class OrdersService {
     });
 
     subtotal = Math.round(subtotal * 100) / 100;
+    // Delivery fee is informational — customer pays vendor/driver directly
     const deliveryFee = DEFAULT_DELIVERY_FEE_ZAR;
-    const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE * 100) / 100;
-    const commissionRate = Number(vendor.commission_rate) / 100 || PLATFORM_COMMISSION_RATE;
-    const vendorPayout = Math.round(subtotal * (1 - commissionRate) * 100) / 100;
-    const totalAmount = Math.round((subtotal + deliveryFee + serviceFee) * 100) / 100;
+    // No platform service fee or commission
+    const serviceFee = 0;
+    const commissionRate = 0;
+    // vendor_payout = full subtotal (no platform cut)
+    const vendorPayout = subtotal;
+    const totalAmount = Math.round((subtotal + deliveryFee) * 100) / 100;
 
     const order = await this.prisma.order.create({
       data: {
@@ -92,10 +96,10 @@ export class OrdersService {
         delivery_fee: deliveryFee,
         service_fee: serviceFee,
         total_amount: totalAmount,
-        commission_rate: commissionRate * 100,
+        commission_rate: commissionRate,
         vendor_payout: vendorPayout,
-        payment_method: dto.paymentMethod,
-        payment_status: dto.paymentMethod === 'cash' ? 'pending' : 'pending',
+        payment_method: 'pay_vendor_directly',
+        payment_status: 'not_applicable',
         status: 'pending',
         delivery_address: dto.deliveryAddress,
         delivery_latitude: dto.deliveryLatitude,
@@ -112,13 +116,7 @@ export class OrdersService {
             special_instructions: item.special_instructions,
           })),
         },
-        payment: {
-          create: {
-            amount: totalAmount,
-            payment_method: dto.paymentMethod,
-            status: 'pending',
-          },
-        },
+        // No Payment row created — KasiEats does not process food payments
       },
       include: ORDER_INCLUDE,
     });
@@ -126,7 +124,7 @@ export class OrdersService {
     await this.notifications.createNotification(
       vendor.user_id,
       'New order received',
-      `You have a new order for R${totalAmount.toFixed(2)}.`,
+      `You have a new order for R${totalAmount.toFixed(2)}. The customer will pay you directly.`,
       'order_placed',
       { relatedOrderId: order.id },
     );
@@ -308,6 +306,23 @@ export class OrdersService {
     await this.notifyAvailableDrivers(order.id, updated.vendor.store_name);
 
     return { success: true, data: formatOrder(updated) };
+  }
+
+  private async assertVendorHasActiveSubscription(vendorId: string): Promise<void> {
+    const now = new Date();
+    const subscription = await this.prisma.vendorSubscription.findFirst({
+      where: {
+        vendor_id: vendorId,
+        status: { in: ['active', 'trialing'] },
+        current_period_end: { gt: now },
+      },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException(
+        'Vendor subscription is inactive. Please renew your KasiEats subscription to accept orders.',
+      );
+    }
   }
 
   private async notifyAvailableDrivers(orderId: string, storeName: string) {
