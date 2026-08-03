@@ -98,8 +98,8 @@ export class OrdersService {
         total_amount: totalAmount,
         commission_rate: commissionRate,
         vendor_payout: vendorPayout,
-        payment_method: 'pay_vendor_directly',
-        payment_status: 'not_applicable',
+        payment_method: dto.paymentMethod ?? 'eft',
+        payment_status: 'awaiting_proof',
         status: 'pending',
         delivery_address: dto.deliveryAddress,
         delivery_latitude: dto.deliveryLatitude,
@@ -116,7 +116,8 @@ export class OrdersService {
             special_instructions: item.special_instructions,
           })),
         },
-        // No Payment row created — KasiEats does not process food payments
+        // No Payment row created — MTHURA does not process food payments.
+        // EFT proof-of-payment state is tracked on the order itself.
       },
       include: ORDER_INCLUDE,
     });
@@ -124,7 +125,7 @@ export class OrdersService {
     await this.notifications.createNotification(
       vendor.user_id,
       'New order received',
-      `You have a new order for R${totalAmount.toFixed(2)}. The customer will pay you directly.`,
+      `You have a new order for R${totalAmount.toFixed(2)}. The customer will pay you via EFT and upload proof for you to verify.`,
       'order_placed',
       { relatedOrderId: order.id },
     );
@@ -176,6 +177,116 @@ export class OrdersService {
     }
 
     return { success: true, data: formatOrder(order) };
+  }
+
+  async uploadEftProof(
+    customerUserId: string,
+    orderId: string,
+    proofUrl: string,
+    reference?: string,
+  ) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { user_id: customerUserId },
+    });
+    if (!customer) {
+      throw new ForbiddenException();
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customer_id: customer.id },
+      include: { vendor: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (!['awaiting_proof', 'proof_submitted', 'rejected'].includes(order.payment_status)) {
+      throw new BadRequestException('EFT proof can no longer be submitted for this order');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        payment_status: 'proof_submitted',
+        eft_proof_url: proofUrl,
+        eft_reference: reference ?? order.eft_reference,
+        eft_proof_uploaded_at: new Date(),
+        eft_rejection_reason: null,
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifications.createNotification(
+      order.vendor.user_id,
+      'EFT proof submitted',
+      'A customer uploaded proof of EFT payment. Please verify it to start preparing the order.',
+      'eft_proof_submitted',
+      { relatedOrderId: order.id },
+    );
+
+    return { success: true, data: formatOrder(updated) };
+  }
+
+  async verifyEft(vendorUserId: string, orderId: string) {
+    const order = await this.getVendorOrder(vendorUserId, orderId);
+    if (order.payment_status === 'verified') {
+      const existing = await this.prisma.order.findUnique({
+        where: { id: order.id },
+        include: ORDER_INCLUDE,
+      });
+      return { success: true, data: formatOrder(existing!) };
+    }
+    if (!['proof_submitted', 'awaiting_proof'].includes(order.payment_status)) {
+      throw new BadRequestException('This order is not awaiting EFT verification');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        payment_status: 'verified',
+        eft_verified_by_vendor: true,
+        eft_verified_at: new Date(),
+        eft_rejection_reason: null,
+        delivery_pin: order.delivery_pin ?? this.generateDeliveryPin(),
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifyCustomer(
+      order.customer_id,
+      order.id,
+      'Payment verified',
+      'The vendor verified your EFT payment and will start preparing your order.',
+    );
+
+    return { success: true, data: formatOrder(updated) };
+  }
+
+  async rejectEft(vendorUserId: string, orderId: string, reason?: string) {
+    const order = await this.getVendorOrder(vendorUserId, orderId);
+    if (!['proof_submitted', 'awaiting_proof'].includes(order.payment_status)) {
+      throw new BadRequestException('This order is not awaiting EFT verification');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        payment_status: 'rejected',
+        eft_verified_by_vendor: false,
+        eft_rejection_reason: reason ?? 'EFT proof could not be verified',
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifyCustomer(
+      order.customer_id,
+      order.id,
+      'EFT proof rejected',
+      reason
+        ? `Your EFT proof was rejected: ${reason}. Please re-upload valid proof of payment.`
+        : 'Your EFT proof was rejected. Please re-upload valid proof of payment.',
+    );
+
+    return { success: true, data: formatOrder(updated) };
   }
 
   async cancelOrder(customerUserId: string, orderId: string, reason?: string) {
@@ -240,10 +351,20 @@ export class OrdersService {
     if (order.status !== 'pending') {
       throw new BadRequestException('Only pending orders can be accepted');
     }
+    // MTHURA flow: merchant must verify EFT before the kitchen starts.
+    if (order.payment_status !== 'verified') {
+      throw new BadRequestException(
+        'Verify the customer EFT payment before accepting this order',
+      );
+    }
 
     const updated = await this.prisma.order.update({
       where: { id: order.id },
-      data: { status: 'accepted', accepted_by_vendor_at: new Date() },
+      data: {
+        status: 'accepted',
+        accepted_by_vendor_at: new Date(),
+        delivery_pin: order.delivery_pin ?? this.generateDeliveryPin(),
+      },
       include: ORDER_INCLUDE,
     });
 
@@ -298,7 +419,11 @@ export class OrdersService {
 
     const updated = await this.prisma.order.update({
       where: { id: order.id },
-      data: { status: 'ready', marked_as_ready_at: new Date() },
+      data: {
+        status: 'ready',
+        marked_as_ready_at: new Date(),
+        delivery_pin: order.delivery_pin ?? this.generateDeliveryPin(),
+      },
       include: ORDER_INCLUDE,
     });
 
@@ -320,9 +445,13 @@ export class OrdersService {
 
     if (!subscription) {
       throw new ForbiddenException(
-        'Vendor subscription is inactive. Please renew your KasiEats subscription to accept orders.',
+        'Vendor subscription is inactive. Please renew your MTHURA subscription to accept orders.',
       );
     }
+  }
+
+  private generateDeliveryPin(): string {
+    return Math.floor(1000 + Math.random() * 9000).toString();
   }
 
   private async notifyAvailableDrivers(orderId: string, storeName: string) {

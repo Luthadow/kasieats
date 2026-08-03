@@ -106,7 +106,7 @@ describe('OrdersService.createOrder', () => {
     expect(result.data.totalAmount).toBe(110);
   });
 
-  it('sets payment_status to not_applicable and payment_method to pay_vendor_directly', async () => {
+  it('sets payment_status to awaiting_proof and payment_method to eft (MTHURA launch model)', async () => {
     prisma.menuItem.findMany.mockResolvedValue([
       { id: 'item-1', price: 35, vendor_id: 'vendor-1', is_available: true },
     ]);
@@ -120,9 +120,9 @@ describe('OrdersService.createOrder', () => {
     await service.createOrder('cust-user', dto);
 
     const created = prisma.order.create.mock.calls[0][0].data;
-    expect(created.payment_status).toBe('not_applicable');
-    expect(created.payment_method).toBe('pay_vendor_directly');
-    // No Payment row created
+    expect(created.payment_status).toBe('awaiting_proof');
+    expect(created.payment_method).toBe('eft');
+    // No Payment row created — EFT proof state lives on the order
     expect(created.payment).toBeUndefined();
   });
 

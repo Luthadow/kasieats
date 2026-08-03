@@ -15,14 +15,14 @@ export class HealthController {
       await this.prisma.$queryRaw`SELECT 1`;
       return {
         status: 'ok',
-        service: 'kasieats-api',
+        service: 'mthura-api',
         timestamp: new Date().toISOString(),
         database: 'connected',
       };
     } catch {
       throw new ServiceUnavailableException({
         status: 'degraded',
-        service: 'kasieats-api',
+        service: 'mthura-api',
         timestamp: new Date().toISOString(),
         database: 'disconnected',
       });

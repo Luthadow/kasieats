@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { DeliveriesService } from './deliveries.service';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
+import { DeliverDto } from './dto/deliver.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -51,7 +52,11 @@ export class DeliveriesController {
   }
 
   @Post(':id/deliver')
-  deliver(@CurrentUser('sub') userId: string, @Param('id') id: string) {
-    return this.deliveriesService.deliver(userId, id);
+  deliver(
+    @CurrentUser('sub') userId: string,
+    @Param('id') id: string,
+    @Body() dto: DeliverDto,
+  ) {
+    return this.deliveriesService.deliver(userId, id, dto.pin);
   }
 }

@@ -24,7 +24,8 @@ export class DeliveriesService {
   ) {}
 
   async getAvailable(driverUserId: string) {
-    await this.getDriver(driverUserId);
+    const driver = await this.getDriver(driverUserId);
+    await this.assertDriverHasActiveSubscription(driver.id);
 
     const orders = await this.prisma.order.findMany({
       where: { status: 'ready', delivery: { is: null } },
@@ -50,6 +51,7 @@ export class DeliveriesService {
 
   async claim(driverUserId: string, orderId: string) {
     const driver = await this.getDriver(driverUserId);
+    await this.assertDriverHasActiveSubscription(driver.id);
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -180,7 +182,7 @@ export class DeliveriesService {
     return { success: true, data: this.format(updated) };
   }
 
-  async deliver(driverUserId: string, deliveryId: string) {
+  async deliver(driverUserId: string, deliveryId: string, pin?: string) {
     const driver = await this.getDriver(driverUserId);
     const delivery = await this.prisma.delivery.findFirst({
       where: { id: deliveryId, driver_id: driver.id },
@@ -197,6 +199,18 @@ export class DeliveriesService {
     }
 
     const order = delivery.order;
+
+    // Delivery PIN verification (MTHURA blueprint): the customer's 4-digit PIN
+    // must be supplied and match before the order can be marked delivered.
+    if (order.delivery_pin) {
+      if (!pin) {
+        throw new BadRequestException('Delivery PIN is required to complete this delivery');
+      }
+      if (pin.trim() !== order.delivery_pin) {
+        throw new BadRequestException('Incorrect delivery PIN');
+      }
+    }
+
     const now = new Date();
     const driverEarned =
       Math.round(Number(order.delivery_fee) * DRIVER_EARNINGS_SHARE * 100) / 100;
@@ -320,6 +334,23 @@ export class DeliveriesService {
       throw new ForbiddenException('Driver account is not active');
     }
     return driver;
+  }
+
+  private async assertDriverHasActiveSubscription(driverId: string): Promise<void> {
+    const now = new Date();
+    const subscription = await this.prisma.driverSubscription.findFirst({
+      where: {
+        driver_id: driverId,
+        status: { in: ['active', 'trialing'] },
+        current_period_end: { gt: now },
+      },
+    });
+
+    if (!subscription) {
+      throw new ForbiddenException(
+        'Driver subscription is inactive. Please renew your MTHURA driver subscription (R80/month) to accept deliveries.',
+      );
+    }
   }
 
   private async getOwnedDelivery(driverUserId: string, deliveryId: string) {

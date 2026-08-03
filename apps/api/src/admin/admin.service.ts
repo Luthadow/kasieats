@@ -22,7 +22,8 @@ export class AdminService {
       drivers,
       ordersToday,
       gmvToday,
-      revenueToday,
+      merchantRevenueToday,
+      driverRevenueToday,
       pendingVendors,
       pendingDrivers,
     ] = await Promise.all([
@@ -30,19 +31,27 @@ export class AdminService {
       this.prisma.vendor.count(),
       this.prisma.driver.count(),
       this.prisma.order.count({ where: { created_at: { gte: startOfToday } } }),
-      // GMV facilitated today (informational — not KasiEats revenue)
+      // GMV facilitated today (informational — not MTHURA revenue)
       this.prisma.order.aggregate({
         _sum: { total_amount: true },
         where: { created_at: { gte: startOfToday }, status: 'delivered' },
       }),
-      // Actual KasiEats revenue: subscription payments paid today
+      // MTHURA revenue: merchant subscription payments paid today
       this.prisma.subscriptionPayment.aggregate({
+        _sum: { amount_zar: true },
+        where: { paid_at: { gte: startOfToday }, status: 'paid' },
+      }),
+      // MTHURA revenue: driver subscription payments paid today
+      this.prisma.driverSubscriptionPayment.aggregate({
         _sum: { amount_zar: true },
         where: { paid_at: { gte: startOfToday }, status: 'paid' },
       }),
       this.prisma.vendor.count({ where: { status: 'pending_approval' } }),
       this.prisma.driver.count({ where: { status: 'pending_approval' } }),
     ]);
+
+    const merchantRevenue = Number(merchantRevenueToday._sum.amount_zar ?? 0);
+    const driverRevenue = Number(driverRevenueToday._sum.amount_zar ?? 0);
 
     return {
       success: true,
@@ -51,8 +60,10 @@ export class AdminService {
         vendors,
         drivers,
         ordersToday,
-        // Subscription revenue collected today
-        revenueToday: Number(revenueToday._sum.amount_zar ?? 0),
+        // Total subscription revenue collected today (merchant + driver)
+        revenueToday: merchantRevenue + driverRevenue,
+        merchantRevenueToday: merchantRevenue,
+        driverRevenueToday: driverRevenue,
         // GMV (order totals) facilitated today — customers pay vendors directly
         gmvToday: Number(gmvToday._sum.total_amount ?? 0),
         pendingApprovals: {
@@ -103,11 +114,11 @@ export class AdminService {
     await this.notifications.createNotification(
       vendor.user_id,
       'Store approved',
-      'Congratulations! Your store has been approved and is now live. You have a 7-day free trial subscription.',
+      'Congratulations! Your store has been approved and is now live. You have a 30-day free trial subscription (then R150/month).',
       'vendor_approved',
     );
 
-    // Create 7-day trial subscription for newly approved vendor
+    // Create 30-day trial subscription for newly approved vendor
     await this.subscriptions.createTrialSubscription(vendor.id);
 
     return { success: true, data: { id: updated.id, status: updated.status } };
@@ -174,9 +185,12 @@ export class AdminService {
     await this.notifications.createNotification(
       driver.user_id,
       'Driver approved',
-      'Your driver application has been approved. You can now go online.',
+      'Your driver application has been approved. You have a 30-day free trial subscription (then R80/month). You can now go online.',
       'driver_approved',
     );
+
+    // Create 30-day trial subscription for newly approved driver
+    await this.subscriptions.createDriverTrialSubscription(driver.id);
 
     return { success: true, data: { id: updated.id, status: updated.status } };
   }

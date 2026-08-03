@@ -29,14 +29,32 @@ export class SubscriptionsController {
   @Post('checkout')
   @UseGuards(RolesGuard)
   @Roles('vendor')
-  @ApiOperation({ summary: 'Initiate monthly subscription payment (sandbox)' })
+  @ApiOperation({ summary: 'Initiate merchant monthly subscription payment (sandbox, R150)' })
   checkout(@Request() req: { user: { sub: string } }) {
     return this.subscriptionsService.initiateCheckout(req.user.sub);
   }
 
+  @Get('driver/me')
+  @UseGuards(RolesGuard)
+  @Roles('driver')
+  @ApiOperation({ summary: "Get driver's current subscription" })
+  getMyDriverSubscription(@Request() req: { user: { sub: string } }) {
+    return this.subscriptionsService.getMyDriverSubscription(req.user.sub);
+  }
+
+  @Post('driver/checkout')
+  @UseGuards(RolesGuard)
+  @Roles('driver')
+  @ApiOperation({ summary: 'Initiate driver monthly subscription payment (sandbox, R80)' })
+  driverCheckout(@Request() req: { user: { sub: string } }) {
+    return this.subscriptionsService.initiateDriverCheckout(req.user.sub);
+  }
+
   @Post('mock-checkout/:ref/confirm')
   @Public()
-  @ApiOperation({ summary: 'Confirm mock sandbox subscription payment' })
+  @ApiOperation({
+    summary: 'Confirm mock sandbox subscription payment (merchant or driver)',
+  })
   confirmMockCheckout(@Param('ref') ref: string) {
     return this.subscriptionsService.confirmMockCheckout(ref);
   }

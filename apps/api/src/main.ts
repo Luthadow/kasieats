@@ -22,8 +22,10 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('KasiEats API')
-    .setDescription('Township food delivery platform API')
+    .setTitle('MTHURA API')
+    .setDescription(
+      'MTHURA — Built for the Township Economy. Township-first digital commerce platform API. Powered by Nkanyezi Tech Solutions (Pty) Ltd.',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -32,7 +34,7 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
-  console.log(`KasiEats API running on http://localhost:${port}`);
+  console.log(`MTHURA API running on http://localhost:${port}`);
   console.log(`API docs: http://localhost:${port}/api/docs`);
 }
 

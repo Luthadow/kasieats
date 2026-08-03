@@ -81,10 +81,10 @@ export class CreateOrderDto {
   @IsString()
   specialInstructions?: string;
 
-  // Customers pay vendors directly — KasiEats does not process food payments.
-  // 'cash' is accepted as a legacy alias for 'pay_vendor_directly'.
-  @ApiPropertyOptional({ enum: ['pay_vendor_directly', 'cash'] })
+  // MTHURA launch model: the customer pays the vendor via EFT and uploads proof.
+  // 'eft' is the default. 'pay_vendor_directly' / 'cash' are legacy aliases.
+  @ApiPropertyOptional({ enum: ['eft', 'pay_vendor_directly', 'cash'] })
   @IsOptional()
-  @IsEnum(['pay_vendor_directly', 'cash'])
-  paymentMethod?: 'pay_vendor_directly' | 'cash';
+  @IsEnum(['eft', 'pay_vendor_directly', 'cash'])
+  paymentMethod?: 'eft' | 'pay_vendor_directly' | 'cash';
 }

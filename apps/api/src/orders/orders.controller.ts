@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderActionDto } from './dto/order-action.dto';
+import { EftProofDto } from './dto/eft-proof.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -48,6 +49,32 @@ export class OrdersController {
     @Body() dto: OrderActionDto,
   ) {
     return this.ordersService.cancelOrder(userId, id, dto.reason);
+  }
+
+  @Post(':id/eft-proof')
+  @Roles('customer')
+  uploadEftProof(
+    @CurrentUser('sub') userId: string,
+    @Param('id') id: string,
+    @Body() dto: EftProofDto,
+  ) {
+    return this.ordersService.uploadEftProof(userId, id, dto.proofUrl, dto.reference);
+  }
+
+  @Post(':id/verify-eft')
+  @Roles('vendor')
+  verifyEft(@CurrentUser('sub') userId: string, @Param('id') id: string) {
+    return this.ordersService.verifyEft(userId, id);
+  }
+
+  @Post(':id/reject-eft')
+  @Roles('vendor')
+  rejectEft(
+    @CurrentUser('sub') userId: string,
+    @Param('id') id: string,
+    @Body() dto: OrderActionDto,
+  ) {
+    return this.ordersService.rejectEft(userId, id, dto.reason);
   }
 
   @Post(':id/accept')
