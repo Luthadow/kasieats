@@ -154,6 +154,11 @@ export interface OrderDto {
   eftRejectionReason?: string | null;
   // 4-digit delivery PIN generated after EFT verification / when ready
   deliveryPin?: string | null;
+  // Merchant banking details for Model A EFT checkout display
+  // Customer pays food + delivery to merchant in one EFT (Financial Ops Blueprint §Model A)
+  merchantBanking?: MerchantBankingDto | null;
+  // Delivery fee settlement annotation — 'merchant_collects' for Model A
+  deliveryFeeSettlement?: string | null;
   subtotal: number;
   deliveryFee: number;
   serviceFee: number;
@@ -205,6 +210,12 @@ export interface AdminDashboardDto {
   // Breakdown of subscription revenue today
   merchantRevenueToday?: number;
   driverRevenueToday?: number;
+  // R350 merchant + R100 driver subscriptions — alias for revenueToday
+  subscriptionRevenueToday?: number;
+  // Subscriptions ending within 7 days or currently past_due
+  merchantsDue?: number;
+  driversDue?: number;
+  outstandingRenewals?: number;
   // GMV facilitated today (informational — not MTHURA revenue)
   gmvToday: number;
   activeVendors: number;
@@ -212,6 +223,14 @@ export interface AdminDashboardDto {
   activeDrivers: number;
   pendingDrivers: number;
   totalCustomers: number;
+}
+
+export interface MerchantBankingDto {
+  bankName: string | null;
+  accountHolder: string | null;
+  /** Last 4 digits only — full account shown at merchant's discretion */
+  accountNumberMasked: string | null;
+  branchCode: string | null;
 }
 
 export interface SubscriptionDto {
