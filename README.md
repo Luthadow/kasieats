@@ -1,17 +1,25 @@
-# KasiEats
+# MTHURA
 
-Township food delivery platform connecting customers, vendors, and drivers across South Africa.
+**Built for the Township Economy**
+Powered by **Nkanyezi Tech Solutions (Pty) Ltd** · HQ Rustenburg, North West, South Africa
+
+MTHURA is a township-first digital commerce platform connecting customers with local businesses through a modern marketplace, delivery network, and business operating system. Food delivery is the **first vertical**; the long-term vision is to become the digital infrastructure for South Africa's township economy.
+
+> Canonical product source of truth: [`MASTER_BLUEPRINT.md`](./MASTER_BLUEPRINT.md). The older `COMPANY_CONSTITUTION.md`, `ARCHITECTURE_BLUEPRINT.md` and `docs/PRD.md` (KasiEats draft) are retained for historical reference only.
 
 ## Business model
 
-KasiEats is a **coordination marketplace**, not a payment processor for food orders.
+MTHURA is a **coordination marketplace**, not a payment processor for food orders. Platform revenue comes exclusively from subscriptions.
 
 | Money flow | Who handles it |
 |---|---|
-| Food order totals, delivery tips | Customer ↔ vendor / driver **directly** (outside the app) |
-| Platform revenue | **Vendor subscription only — R350 / month** (Ozow when live; sandbox mock today) |
+| Food order totals, delivery tips | Customer → vendor via **EFT + uploaded proof** (bank-to-vendor, outside the app) |
+| Merchant subscription | **R150 / month** after a **30-day free trial** |
+| Driver subscription | **R80 / month** after a **30-day free trial** |
 
-Orders still show item totals and a suggested delivery amount for clarity, but KasiEats never charges cards for meals and takes **no commission** on orders.
+**Launch food payments = EFT + proof of payment.** The customer pays the vendor by EFT and uploads proof in-app; the merchant verifies before the kitchen starts. A 4-digit delivery PIN is generated on verification and confirmed by the driver on delivery. MTHURA **does not hold or process food purchase money** at launch and takes **no commission** on orders.
+
+Payment gateways (**Ozow**, PayFast, Yoco, etc.) are reserved for **platform subscriptions in the future** — they are **not** used for food checkout at launch. Today subscription billing runs through a sandbox mock flow.
 
 ## Services
 
@@ -124,7 +132,9 @@ Key variables:
 | `REDIS_URL` | redis://… | Redis connection string |
 | `JWT_SECRET` | — | **Must change in production** |
 | `SMS_PROVIDER` | `console` | `console` (dev) or `twilio` |
-| `PAYMENT_MODE` | `sandbox` | `sandbox`, `payfast`, or `yoco` |
+| `PAYMENT_MODE` | `sandbox` | Platform subscription billing only (`sandbox` or `ozow`). Not used for food checkout. |
+| `OZOW_MERCHANT_ID` | — | Ozow merchant id (reserved for subscriptions — use secrets, not chat) |
+| `OZOW_PRIVATE_KEY` | — | Ozow private key (never commit) |
 | `CORS_ORIGIN` | localhost:3001,3002 | Comma-separated allowed origins |
 
 ## Database

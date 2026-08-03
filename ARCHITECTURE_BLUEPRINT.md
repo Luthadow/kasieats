@@ -1,3 +1,5 @@
+> **Superseded for product direction.** Canonical source of truth: [`MASTER_BLUEPRINT.md`](./MASTER_BLUEPRINT.md) (MTHURA). Historical KasiEats draft retained for reference only.
+
 # ARCHITECTURE BLUEPRINT
 ## Volume 4: Technical System Design
 

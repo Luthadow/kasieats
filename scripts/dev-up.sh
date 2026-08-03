@@ -73,7 +73,7 @@ yarn workspace @kasieats/db db:seed
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  KasiEats dev environment is ready!${NC}"
+echo -e "${GREEN}  MTHURA dev environment is ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo "  Next steps:"

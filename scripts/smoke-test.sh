@@ -31,7 +31,7 @@ check_status() {
 }
 
 echo ""
-echo "=== KasiEats API smoke tests ==="
+echo "=== MTHURA API smoke tests ==="
 echo "    Target: $API_URL"
 echo ""
 
