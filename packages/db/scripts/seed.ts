@@ -74,7 +74,13 @@ async function main() {
 
   const vendor = await prisma.vendor.upsert({
     where: { user_id: vendorUser.id },
-    update: {},
+    update: {
+      // Populate banking details for EFT checkout display (Financial Ops Blueprint §Checkout)
+      bank_name: 'FNB',
+      bank_account_holder: "Mama Lindiwe's Kota Stand",
+      bank_account_number: '62123456789',
+      bank_code: '250655',
+    },
     create: {
       user_id: vendorUser.id,
       store_name: "Mama Lindiwe's Kota Stand",
@@ -91,6 +97,11 @@ async function main() {
       approved_at: new Date(),
       average_rating: 4.8,
       rating_count: 42,
+      // FNB banking details for EFT display (Financial Ops Blueprint §Checkout display)
+      bank_name: 'FNB',
+      bank_account_holder: "Mama Lindiwe's Kota Stand",
+      bank_account_number: '62123456789',
+      bank_code: '250655',
     },
   });
 
@@ -280,9 +291,12 @@ async function main() {
     },
   });
 
-  // Seed active subscriptions for both vendors (R150/month — MTHURA platform revenue)
-  const subscriptionPeriodEnd = new Date();
+  // Seed active subscriptions — R350/month merchant, R100/month driver (Financial Ops Blueprint)
+  const now = new Date();
+  const subscriptionPeriodEnd = new Date(now);
   subscriptionPeriodEnd.setDate(subscriptionPeriodEnd.getDate() + 30);
+  const subscriptionGraceEnd = new Date(subscriptionPeriodEnd);
+  subscriptionGraceEnd.setDate(subscriptionGraceEnd.getDate() + 7);
 
   for (const seedVendor of [vendor, vendor2]) {
     const existingSub = await prisma.vendorSubscription.findFirst({
@@ -294,16 +308,26 @@ async function main() {
         data: {
           vendor_id: seedVendor.id,
           status: 'active',
-          amount_zar: 150,
-          current_period_start: new Date(),
+          amount_zar: 350,
+          current_period_start: now,
           current_period_end: subscriptionPeriodEnd,
-          last_payment_at: new Date(),
+          grace_ends_at: subscriptionGraceEnd,
+          last_payment_at: now,
+        },
+      });
+    } else {
+      // Update existing seed subscription to R350 and populate grace_ends_at
+      await prisma.vendorSubscription.update({
+        where: { id: existingSub.id },
+        data: {
+          amount_zar: 350,
+          grace_ends_at: existingSub.grace_ends_at ?? subscriptionGraceEnd,
         },
       });
     }
   }
 
-  // Seed an active driver subscription (R80/month for 30 days — MTHURA platform revenue)
+  // Seed an active driver subscription (R100/month — Financial Ops Blueprint §2)
   const existingDriverSub = await prisma.driverSubscription.findFirst({
     where: { driver_id: driver.id },
   });
@@ -313,10 +337,19 @@ async function main() {
       data: {
         driver_id: driver.id,
         status: 'active',
-        amount_zar: 80,
-        current_period_start: new Date(),
+        amount_zar: 100,
+        current_period_start: now,
         current_period_end: subscriptionPeriodEnd,
-        last_payment_at: new Date(),
+        grace_ends_at: subscriptionGraceEnd,
+        last_payment_at: now,
+      },
+    });
+  } else {
+    await prisma.driverSubscription.update({
+      where: { id: existingDriverSub.id },
+      data: {
+        amount_zar: 100,
+        grace_ends_at: existingDriverSub.grace_ends_at ?? subscriptionGraceEnd,
       },
     });
   }
@@ -324,10 +357,11 @@ async function main() {
   console.log('Seed complete.');
   console.log(`Admin user: ${adminUser.phone}`);
   console.log(`Customer: ${customerUser.phone}`);
-  console.log(`Vendor: ${vendor.store_name}`);
-  console.log('Note: Both vendors have active R150/month merchant subscriptions (MTHURA revenue).');
-  console.log('Note: The seed driver has an active R80/month subscription (MTHURA revenue).');
+  console.log(`Vendor: ${vendor.store_name} (FNB 62123456789 branch 250655)`);
+  console.log('Note: Both vendors have active R350/month merchant subscriptions (MTHURA revenue).');
+  console.log('Note: The seed driver has an active R100/month subscription (MTHURA revenue).');
   console.log('Note: Food orders are paid by customers to vendors via EFT + proof — MTHURA takes no cut.');
+  console.log('Note: Grace period = 7 days after period end (Financial Ops Blueprint).');
 }
 
 main()

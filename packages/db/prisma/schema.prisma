@@ -95,9 +95,11 @@ model Vendor {
   operating_hours             Json     @default("{\"monday\": {\"open\": \"08:00\", \"close\": \"18:00\"}}")
   is_open_now                 Boolean  @default(false)
   commission_rate             Decimal  @default(0) @db.Decimal(5, 2) // unused — platform takes no order commission
+  // EFT banking details for Model A delivery fee settlement (Financial Ops Blueprint)
+  bank_name                   String?
   bank_account_holder         String?
   bank_account_number         String?
-  bank_code                   String?
+  bank_code                   String? // branch code
   tax_id                      String?
   id_document_url             String?
   id_document_verified        Boolean  @default(false)
@@ -531,15 +533,17 @@ model AuditLog {
   @@index([created_at])
 }
 
-// Merchant subscription billing — MTHURA platform revenue (R150/month)
+// Merchant subscription billing — MTHURA platform revenue (R350/month, Financial Ops Blueprint §1)
 model VendorSubscription {
   id                   String   @id @default(cuid())
   vendor_id            String
   status               String   @default("trialing") // trialing|active|past_due|cancelled|expired
-  amount_zar           Decimal  @default(150) @db.Decimal(10, 2)
+  amount_zar           Decimal  @default(350) @db.Decimal(10, 2)
   currency             String   @default("ZAR")
   current_period_start DateTime
   current_period_end   DateTime
+  // grace_ends_at = current_period_end + 7 days (Financial Ops Blueprint §Grace Period)
+  grace_ends_at        DateTime?
   trial_ends_at        DateTime?
   cancelled_at         DateTime?
   ozow_transaction_id  String?
@@ -553,6 +557,7 @@ model VendorSubscription {
   @@index([vendor_id])
   @@index([status])
   @@index([current_period_end])
+  @@index([grace_ends_at])
 }
 
 model SubscriptionPayment {
@@ -574,15 +579,17 @@ model SubscriptionPayment {
   @@index([status])
 }
 
-// Driver subscription billing — MTHURA platform revenue (R80/month)
+// Driver subscription billing — MTHURA platform revenue (R100/month, Financial Ops Blueprint §2)
 model DriverSubscription {
   id                   String   @id @default(cuid())
   driver_id            String
   status               String   @default("trialing") // trialing|active|past_due|cancelled|expired
-  amount_zar           Decimal  @default(80) @db.Decimal(10, 2)
+  amount_zar           Decimal  @default(100) @db.Decimal(10, 2)
   currency             String   @default("ZAR")
   current_period_start DateTime
   current_period_end   DateTime
+  // grace_ends_at = current_period_end + 7 days (Financial Ops Blueprint §Grace Period)
+  grace_ends_at        DateTime?
   trial_ends_at        DateTime?
   cancelled_at         DateTime?
   ozow_transaction_id  String?
@@ -596,6 +603,7 @@ model DriverSubscription {
   @@index([driver_id])
   @@index([status])
   @@index([current_period_end])
+  @@index([grace_ends_at])
 }
 
 model DriverSubscriptionPayment {
