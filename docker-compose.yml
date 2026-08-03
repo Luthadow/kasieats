@@ -1,4 +1,5 @@
 services:
+  # ─── Infrastructure ────────────────────────────────────────────────────────
   postgres:
     image: postgis/postgis:15-3.4
     container_name: kasieats-postgres
@@ -48,6 +49,69 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
+
+  # ─── Application Services ─────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: kasieats-api
+    restart: unless-stopped
+    env_file:
+      - .env.example
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://kasieats_user:kasieats_password@postgres:5432/kasieats
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://kasieats_user:kasieats_password@rabbitmq:5672
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    # Run migrations then start the server
+    command: >
+      sh -c "
+        node_modules/.bin/prisma migrate deploy --schema=packages/db/prisma/schema.prisma &&
+        node apps/api/dist/main
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  vendor-web:
+    build:
+      context: .
+      dockerfile: apps/vendor-web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000/api/v1
+    container_name: kasieats-vendor-web
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - api
+
+  admin-web:
+    build:
+      context: .
+      dockerfile: apps/admin-web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000/api/v1
+    container_name: kasieats-admin-web
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

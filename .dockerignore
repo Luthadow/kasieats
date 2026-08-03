@@ -1,0 +1,48 @@
+# ─── Version control ──────────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ─── Node / Yarn ──────────────────────────────────────────────────────────────
+node_modules
+**/node_modules
+.yarn/cache
+.yarn/unplugged
+.pnp.*
+npm-debug.log*
+yarn-error.log*
+
+# ─── Build outputs (copied explicitly in Dockerfile) ─────────────────────────
+**/dist
+**/.turbo
+**/tsconfig.tsbuildinfo
+
+# ─── Environment files ────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+**/.env.local
+
+# ─── OS / Editor ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+*.swp
+*.swo
+
+# ─── Test / Coverage ─────────────────────────────────────────────────────────
+**/coverage
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+**/*.test.js
+**/*.spec.js
+
+# ─── Docs / CI (not needed in image) ─────────────────────────────────────────
+docs
+*.md
+.github
+scripts
+
+# ─── Mobile (not built in Docker) ────────────────────────────────────────────
+apps/customer-app

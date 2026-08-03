@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "cursor/**"]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+  # Dummy DATABASE_URL for prisma generate (no real DB needed in CI)
+  DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+
+jobs:
+  # ─── Shared + DB ────────────────────────────────────────────────────────────
+  build-packages:
+    name: Build shared packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build @kasieats/shared
+        run: yarn workspace @kasieats/shared build
+
+      - name: Generate Prisma client
+        run: yarn workspace @kasieats/db db:generate
+
+      - name: Build @kasieats/db
+        run: yarn workspace @kasieats/db build
+
+      - name: Upload shared build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-dist
+          path: |
+            packages/shared/dist
+            packages/db/dist
+          retention-days: 1
+
+  # ─── API ────────────────────────────────────────────────────────────────────
+  api:
+    name: API lint, build & test
+    runs-on: ubuntu-latest
+    needs: build-packages
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Download shared artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: packages-dist
+          path: .
+
+      - name: Lint (tsc)
+        run: yarn workspace @kasieats/api lint
+
+      - name: Build API
+        run: yarn workspace @kasieats/api build
+
+      - name: Test API
+        run: yarn workspace @kasieats/api test --passWithNoTests
+        env:
+          JWT_SECRET: ci-test-secret
+
+  # ─── Vendor Web ─────────────────────────────────────────────────────────────
+  vendor-web:
+    name: vendor-web build
+    runs-on: ubuntu-latest
+    needs: build-packages
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Download shared artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: packages-dist
+          path: .
+
+      - name: Build vendor-web
+        run: yarn workspace @kasieats/vendor-web build
+        env:
+          VITE_API_URL: http://localhost:3000/api/v1
+
+  # ─── Admin Web ──────────────────────────────────────────────────────────────
+  admin-web:
+    name: admin-web build
+    runs-on: ubuntu-latest
+    needs: build-packages
+    # Only run when the app directory exists
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if admin-web exists
+        id: check
+        run: |
+          if [ -f "apps/admin-web/package.json" ] && grep -q '"build"' apps/admin-web/package.json; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        if: steps.check.outputs.exists == 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Download shared artifacts
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: packages-dist
+          path: .
+
+      - name: Build admin-web
+        if: steps.check.outputs.exists == 'true'
+        run: yarn workspace @kasieats/admin-web build
+        env:
+          VITE_API_URL: http://localhost:3000/api/v1

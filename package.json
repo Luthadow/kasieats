@@ -13,8 +13,14 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "db:migrate": "yarn workspace @kasieats/db db:migrate",
+    "db:migrate:deploy": "yarn workspace @kasieats/db db:migrate:deploy",
     "db:seed": "yarn workspace @kasieats/db db:seed",
-    "db:generate": "yarn workspace @kasieats/db db:generate"
+    "db:generate": "yarn workspace @kasieats/db db:generate",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:build": "docker compose build",
+    "dev:infra": "docker compose up -d postgres redis rabbitmq",
+    "smoke": "bash scripts/smoke-test.sh"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
