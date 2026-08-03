@@ -16,6 +16,10 @@ export class AdminService {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
+    // Subscriptions due = past_due OR ending within 7 days
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+
     const [
       users,
       vendors,
@@ -26,6 +30,8 @@ export class AdminService {
       driverRevenueToday,
       pendingVendors,
       pendingDrivers,
+      merchantsDue,
+      driversDue,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.vendor.count(),
@@ -36,22 +42,47 @@ export class AdminService {
         _sum: { total_amount: true },
         where: { created_at: { gte: startOfToday }, status: 'delivered' },
       }),
-      // MTHURA revenue: merchant subscription payments paid today
+      // MTHURA revenue: merchant subscription payments paid today (R350/subscription)
       this.prisma.subscriptionPayment.aggregate({
         _sum: { amount_zar: true },
         where: { paid_at: { gte: startOfToday }, status: 'paid' },
       }),
-      // MTHURA revenue: driver subscription payments paid today
+      // MTHURA revenue: driver subscription payments paid today (R100/subscription)
       this.prisma.driverSubscriptionPayment.aggregate({
         _sum: { amount_zar: true },
         where: { paid_at: { gte: startOfToday }, status: 'paid' },
       }),
       this.prisma.vendor.count({ where: { status: 'pending_approval' } }),
       this.prisma.driver.count({ where: { status: 'pending_approval' } }),
+      // Merchant subscriptions past_due or ending within 7 days (Financial Ops Blueprint §Grace)
+      this.prisma.vendorSubscription.count({
+        where: {
+          OR: [
+            { status: 'past_due' },
+            {
+              status: { in: ['trialing', 'active'] },
+              current_period_end: { lte: sevenDaysFromNow },
+            },
+          ],
+        },
+      }),
+      // Driver subscriptions past_due or ending within 7 days
+      this.prisma.driverSubscription.count({
+        where: {
+          OR: [
+            { status: 'past_due' },
+            {
+              status: { in: ['trialing', 'active'] },
+              current_period_end: { lte: sevenDaysFromNow },
+            },
+          ],
+        },
+      }),
     ]);
 
     const merchantRevenue = Number(merchantRevenueToday._sum.amount_zar ?? 0);
     const driverRevenue = Number(driverRevenueToday._sum.amount_zar ?? 0);
+    const subscriptionRevenueToday = merchantRevenue + driverRevenue;
 
     return {
       success: true,
@@ -60,10 +91,15 @@ export class AdminService {
         vendors,
         drivers,
         ordersToday,
-        // Total subscription revenue collected today (merchant + driver)
-        revenueToday: merchantRevenue + driverRevenue,
+        // Total subscription revenue collected today (merchant R350 + driver R100)
+        revenueToday: subscriptionRevenueToday,
+        subscriptionRevenueToday,
         merchantRevenueToday: merchantRevenue,
         driverRevenueToday: driverRevenue,
+        // Renewals due — subscriptions expiring within 7 days or already past_due
+        merchantsDue,
+        driversDue,
+        outstandingRenewals: merchantsDue + driversDue,
         // GMV (order totals) facilitated today — customers pay vendors directly
         gmvToday: Number(gmvToday._sum.total_amount ?? 0),
         pendingApprovals: {
@@ -114,7 +150,7 @@ export class AdminService {
     await this.notifications.createNotification(
       vendor.user_id,
       'Store approved',
-      'Congratulations! Your store has been approved and is now live. You have a 30-day free trial subscription (then R150/month).',
+      'Congratulations! Your store has been approved and is now live. You have a 30-day free trial subscription (then R350/month).',
       'vendor_approved',
     );
 
@@ -185,7 +221,7 @@ export class AdminService {
     await this.notifications.createNotification(
       driver.user_id,
       'Driver approved',
-      'Your driver application has been approved. You have a 30-day free trial subscription (then R80/month). You can now go online.',
+      'Your driver application has been approved. You have a 30-day free trial subscription (then R100/month). You can now go online.',
       'driver_approved',
     );
 

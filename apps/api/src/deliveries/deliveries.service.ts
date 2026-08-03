@@ -9,6 +9,7 @@ import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
+import { hasActiveAccess } from '../subscriptions/subscriptions.service';
 
 const DELIVERY_INCLUDE = {
   order: { include: { vendor: true, customer: true } },
@@ -337,18 +338,14 @@ export class DeliveriesService {
   }
 
   private async assertDriverHasActiveSubscription(driverId: string): Promise<void> {
-    const now = new Date();
     const subscription = await this.prisma.driverSubscription.findFirst({
-      where: {
-        driver_id: driverId,
-        status: { in: ['active', 'trialing'] },
-        current_period_end: { gt: now },
-      },
+      where: { driver_id: driverId },
+      orderBy: { created_at: 'desc' },
     });
 
-    if (!subscription) {
+    if (!hasActiveAccess(subscription)) {
       throw new ForbiddenException(
-        'Driver subscription is inactive. Please renew your MTHURA driver subscription (R80/month) to accept deliveries.',
+        'Driver subscription is inactive. Please renew your MTHURA driver subscription (R100/month) to accept deliveries.',
       );
     }
   }

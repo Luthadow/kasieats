@@ -29,7 +29,7 @@ export class SubscriptionsController {
   @Post('checkout')
   @UseGuards(RolesGuard)
   @Roles('vendor')
-  @ApiOperation({ summary: 'Initiate merchant monthly subscription payment (sandbox, R150)' })
+  @ApiOperation({ summary: 'Initiate merchant monthly subscription payment (sandbox, R350)' })
   checkout(@Request() req: { user: { sub: string } }) {
     return this.subscriptionsService.initiateCheckout(req.user.sub);
   }
@@ -45,7 +45,7 @@ export class SubscriptionsController {
   @Post('driver/checkout')
   @UseGuards(RolesGuard)
   @Roles('driver')
-  @ApiOperation({ summary: 'Initiate driver monthly subscription payment (sandbox, R80)' })
+  @ApiOperation({ summary: 'Initiate driver monthly subscription payment (sandbox, R100)' })
   driverCheckout(@Request() req: { user: { sub: string } }) {
     return this.subscriptionsService.initiateDriverCheckout(req.user.sub);
   }

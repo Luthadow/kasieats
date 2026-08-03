@@ -6,12 +6,14 @@ import {
 } from '@nestjs/common';
 import {
   DEFAULT_DELIVERY_FEE_ZAR,
+  DELIVERY_FEE_SETTLEMENT_MODEL,
 } from '@kasieats/shared';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { formatOrder } from './order.formatter';
+import { hasActiveAccess } from '../subscriptions/subscriptions.service';
 
 const ORDER_INCLUDE = {
   vendor: true,
@@ -40,7 +42,7 @@ export class OrdersService {
       throw new NotFoundException('Vendor not available');
     }
 
-    // Require vendor to have an active or trialing subscription
+    // Require vendor to have an active subscription (with 7-day grace window)
     await this.assertVendorHasActiveSubscription(vendor.id);
 
     // Deduplicate menu item ids for validation lookup.
@@ -79,14 +81,16 @@ export class OrdersService {
     });
 
     subtotal = Math.round(subtotal * 100) / 100;
-    // Delivery fee is informational — customer pays vendor/driver directly
+    // Model A: customer pays food + delivery to merchant in one EFT
     const deliveryFee = DEFAULT_DELIVERY_FEE_ZAR;
-    // No platform service fee or commission
     const serviceFee = 0;
     const commissionRate = 0;
-    // vendor_payout = full subtotal (no platform cut)
     const vendorPayout = subtotal;
     const totalAmount = Math.round((subtotal + deliveryFee) * 100) / 100;
+
+    // Generate unique EFT reference for this order — MTHURA-{8-char alphanumeric}
+    // Used by customer when making the bank transfer so merchant can identify the payment.
+    const eftReference = this.generateEftReference();
 
     const order = await this.prisma.order.create({
       data: {
@@ -106,6 +110,8 @@ export class OrdersService {
         delivery_longitude: dto.deliveryLongitude,
         special_instructions: dto.specialInstructions,
         estimated_delivery_minutes: 35,
+        // Pre-assigned EFT reference — unique per order, generated at creation
+        eft_reference: eftReference,
         order_items: {
           create: orderItemsData.map((item) => ({
             menu_item: { connect: { id: item.menu_item_id } },
@@ -125,7 +131,7 @@ export class OrdersService {
     await this.notifications.createNotification(
       vendor.user_id,
       'New order received',
-      `You have a new order for R${totalAmount.toFixed(2)}. The customer will pay you via EFT and upload proof for you to verify.`,
+      `You have a new order for R${totalAmount.toFixed(2)}. The customer will pay you via EFT (ref: ${eftReference}) and upload proof for you to verify.`,
       'order_placed',
       { relatedOrderId: order.id },
     );
@@ -199,7 +205,15 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    if (!['awaiting_proof', 'proof_submitted', 'rejected'].includes(order.payment_status)) {
+
+    // Block re-uploads: proof can only be submitted once (Financial Ops Blueprint §Fraud Prevention)
+    // A prior upload is indicated by eft_proof_uploaded_at being set OR status not awaiting_proof.
+    if (order.eft_proof_uploaded_at) {
+      throw new BadRequestException(
+        'EFT proof has already been uploaded for this order. Contact support if you need to dispute.',
+      );
+    }
+    if (order.payment_status !== 'awaiting_proof') {
       throw new BadRequestException('EFT proof can no longer be submitted for this order');
     }
 
@@ -208,6 +222,7 @@ export class OrdersService {
       data: {
         payment_status: 'proof_submitted',
         eft_proof_url: proofUrl,
+        // Keep the pre-assigned reference unless customer explicitly overrides
         eft_reference: reference ?? order.eft_reference,
         eft_proof_uploaded_at: new Date(),
         eft_rejection_reason: null,
@@ -254,8 +269,8 @@ export class OrdersService {
     await this.notifyCustomer(
       order.customer_id,
       order.id,
-      'Payment verified',
-      'The vendor verified your EFT payment and will start preparing your order.',
+      'Payment Confirmed',
+      'The vendor confirmed your EFT payment and will start preparing your order.',
     );
 
     return { success: true, data: formatOrder(updated) };
@@ -273,6 +288,8 @@ export class OrdersService {
         payment_status: 'rejected',
         eft_verified_by_vendor: false,
         eft_rejection_reason: reason ?? 'EFT proof could not be verified',
+        // Clear uploaded_at to allow customer to re-submit after rejection
+        eft_proof_uploaded_at: null,
       },
       include: ORDER_INCLUDE,
     });
@@ -434,20 +451,30 @@ export class OrdersService {
   }
 
   private async assertVendorHasActiveSubscription(vendorId: string): Promise<void> {
-    const now = new Date();
     const subscription = await this.prisma.vendorSubscription.findFirst({
-      where: {
-        vendor_id: vendorId,
-        status: { in: ['active', 'trialing'] },
-        current_period_end: { gt: now },
-      },
+      where: { vendor_id: vendorId },
+      orderBy: { created_at: 'desc' },
     });
 
-    if (!subscription) {
+    if (!hasActiveAccess(subscription)) {
       throw new ForbiddenException(
-        'Vendor subscription is inactive. Please renew your MTHURA subscription to accept orders.',
+        'Vendor subscription is inactive. Please renew your MTHURA subscription (R350/month) to accept orders.',
       );
     }
+  }
+
+  /**
+   * Generate a unique EFT payment reference for an order.
+   * Format: MTHURA-XXXXXXXX (8 uppercase alphanumeric chars)
+   * Financial Ops Blueprint §Checkout display / §Fraud Prevention
+   */
+  private generateEftReference(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = 'MTHURA-';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   }
 
   private generateDeliveryPin(): string {

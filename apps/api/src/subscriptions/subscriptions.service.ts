@@ -13,7 +13,33 @@ import {
   DRIVER_SUBSCRIPTION_FEE_ZAR,
   DRIVER_SUBSCRIPTION_PERIOD_DAYS,
   DRIVER_TRIAL_PERIOD_DAYS,
+  SUBSCRIPTION_GRACE_PERIOD_DAYS,
 } from '@kasieats/shared';
+
+// ─── Grace-period access helper ──────────────────────────────────────────────
+// Active access = status in trialing|active|past_due AND now <= grace_ends_at
+// (grace_ends_at = current_period_end + 7 days, Financial Ops Blueprint §Grace)
+// Expired: status=expired OR now > grace_ends_at — cannot accept NEW work.
+
+export interface SubscriptionAccessRecord {
+  status: string;
+  current_period_end: Date;
+  grace_ends_at: Date | null;
+}
+
+export function hasActiveAccess(subscription: SubscriptionAccessRecord | null): boolean {
+  if (!subscription) return false;
+  if (!['trialing', 'active', 'past_due'].includes(subscription.status)) return false;
+  const now = new Date();
+  // Use grace_ends_at when present; fall back to period_end + GRACE for legacy rows
+  const graceCutoff =
+    subscription.grace_ends_at ??
+    new Date(
+      subscription.current_period_end.getTime() +
+        SUBSCRIPTION_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000,
+    );
+  return now <= graceCutoff;
+}
 
 @Injectable()
 export class SubscriptionsService {
@@ -43,6 +69,9 @@ export class SubscriptionsService {
     };
   }
 
+  /**
+   * Initiate merchant subscription checkout — R350/month (Financial Ops Blueprint §1)
+   */
   async initiateCheckout(vendorUserId: string) {
     const vendor = await this.getVendorByUser(vendorUserId);
 
@@ -56,6 +85,8 @@ export class SubscriptionsService {
       const now = new Date();
       const periodEnd = new Date(now);
       periodEnd.setDate(periodEnd.getDate() + VENDOR_SUBSCRIPTION_PERIOD_DAYS);
+      const graceEnd = new Date(periodEnd);
+      graceEnd.setDate(graceEnd.getDate() + SUBSCRIPTION_GRACE_PERIOD_DAYS);
 
       subscription = await this.prisma.vendorSubscription.create({
         data: {
@@ -64,6 +95,7 @@ export class SubscriptionsService {
           amount_zar: VENDOR_SUBSCRIPTION_FEE_ZAR,
           current_period_start: now,
           current_period_end: periodEnd,
+          grace_ends_at: graceEnd,
         },
       });
     }
@@ -114,6 +146,9 @@ export class SubscriptionsService {
     };
   }
 
+  /**
+   * Initiate driver subscription checkout — R100/month (Financial Ops Blueprint §2)
+   */
   async initiateDriverCheckout(driverUserId: string) {
     const driver = await this.getDriverByUser(driverUserId);
 
@@ -126,6 +161,8 @@ export class SubscriptionsService {
       const now = new Date();
       const periodEnd = new Date(now);
       periodEnd.setDate(periodEnd.getDate() + DRIVER_SUBSCRIPTION_PERIOD_DAYS);
+      const graceEnd = new Date(periodEnd);
+      graceEnd.setDate(graceEnd.getDate() + SUBSCRIPTION_GRACE_PERIOD_DAYS);
 
       subscription = await this.prisma.driverSubscription.create({
         data: {
@@ -134,6 +171,7 @@ export class SubscriptionsService {
           amount_zar: DRIVER_SUBSCRIPTION_FEE_ZAR,
           current_period_start: now,
           current_period_end: periodEnd,
+          grace_ends_at: graceEnd,
         },
       });
     }
@@ -206,6 +244,8 @@ export class SubscriptionsService {
       subscription.current_period_end > now ? subscription.current_period_end : now;
     const newPeriodEnd = new Date(baseDate);
     newPeriodEnd.setDate(newPeriodEnd.getDate() + VENDOR_SUBSCRIPTION_PERIOD_DAYS);
+    const newGraceEnd = new Date(newPeriodEnd);
+    newGraceEnd.setDate(newGraceEnd.getDate() + SUBSCRIPTION_GRACE_PERIOD_DAYS);
 
     await this.prisma.$transaction([
       this.prisma.subscriptionPayment.update({
@@ -217,6 +257,7 @@ export class SubscriptionsService {
         data: {
           status: 'active',
           current_period_end: newPeriodEnd,
+          grace_ends_at: newGraceEnd,
           last_payment_at: now,
         },
       }),
@@ -257,6 +298,8 @@ export class SubscriptionsService {
       subscription.current_period_end > now ? subscription.current_period_end : now;
     const newPeriodEnd = new Date(baseDate);
     newPeriodEnd.setDate(newPeriodEnd.getDate() + DRIVER_SUBSCRIPTION_PERIOD_DAYS);
+    const newGraceEnd = new Date(newPeriodEnd);
+    newGraceEnd.setDate(newGraceEnd.getDate() + SUBSCRIPTION_GRACE_PERIOD_DAYS);
 
     await this.prisma.$transaction([
       this.prisma.driverSubscriptionPayment.update({
@@ -268,6 +311,7 @@ export class SubscriptionsService {
         data: {
           status: 'active',
           current_period_end: newPeriodEnd,
+          grace_ends_at: newGraceEnd,
           last_payment_at: now,
         },
       }),
@@ -326,6 +370,8 @@ export class SubscriptionsService {
     const now = new Date();
     const trialEnd = new Date(now);
     trialEnd.setDate(trialEnd.getDate() + VENDOR_TRIAL_PERIOD_DAYS);
+    const graceEnd = new Date(trialEnd);
+    graceEnd.setDate(graceEnd.getDate() + SUBSCRIPTION_GRACE_PERIOD_DAYS);
 
     await this.prisma.vendorSubscription.create({
       data: {
@@ -334,6 +380,7 @@ export class SubscriptionsService {
         amount_zar: VENDOR_SUBSCRIPTION_FEE_ZAR,
         current_period_start: now,
         current_period_end: trialEnd,
+        grace_ends_at: graceEnd,
         trial_ends_at: trialEnd,
       },
     });
@@ -355,6 +402,8 @@ export class SubscriptionsService {
     const now = new Date();
     const trialEnd = new Date(now);
     trialEnd.setDate(trialEnd.getDate() + DRIVER_TRIAL_PERIOD_DAYS);
+    const graceEnd = new Date(trialEnd);
+    graceEnd.setDate(graceEnd.getDate() + SUBSCRIPTION_GRACE_PERIOD_DAYS);
 
     await this.prisma.driverSubscription.create({
       data: {
@@ -363,6 +412,7 @@ export class SubscriptionsService {
         amount_zar: DRIVER_SUBSCRIPTION_FEE_ZAR,
         current_period_start: now,
         current_period_end: trialEnd,
+        grace_ends_at: graceEnd,
         trial_ends_at: trialEnd,
       },
     });
@@ -375,6 +425,7 @@ export class SubscriptionsService {
     amount_zar: { toNumber: () => number } | number;
     current_period_start: Date;
     current_period_end: Date;
+    grace_ends_at: Date | null;
     trial_ends_at: Date | null;
     cancelled_at: Date | null;
     last_payment_at: Date | null;
@@ -396,10 +447,12 @@ export class SubscriptionsService {
       amountZar: this.toNumber(subscription.amount_zar),
       currentPeriodStart: subscription.current_period_start,
       currentPeriodEnd: subscription.current_period_end,
+      graceEndsAt: subscription.grace_ends_at,
       trialEndsAt: subscription.trial_ends_at,
       cancelledAt: subscription.cancelled_at,
       lastPaymentAt: subscription.last_payment_at,
       createdAt: subscription.created_at,
+      hasActiveAccess: hasActiveAccess(subscription),
       recentPayments: (subscription.payments ?? []).map((p) => ({
         id: p.id,
         amountZar: this.toNumber(p.amount_zar),
@@ -419,6 +472,7 @@ export class SubscriptionsService {
     amount_zar: { toNumber: () => number } | number;
     current_period_start: Date;
     current_period_end: Date;
+    grace_ends_at: Date | null;
     trial_ends_at: Date | null;
     cancelled_at: Date | null;
     last_payment_at: Date | null;
@@ -440,10 +494,12 @@ export class SubscriptionsService {
       amountZar: this.toNumber(subscription.amount_zar),
       currentPeriodStart: subscription.current_period_start,
       currentPeriodEnd: subscription.current_period_end,
+      graceEndsAt: subscription.grace_ends_at,
       trialEndsAt: subscription.trial_ends_at,
       cancelledAt: subscription.cancelled_at,
       lastPaymentAt: subscription.last_payment_at,
       createdAt: subscription.created_at,
+      hasActiveAccess: hasActiveAccess(subscription),
       recentPayments: (subscription.payments ?? []).map((p) => ({
         id: p.id,
         amountZar: this.toNumber(p.amount_zar),

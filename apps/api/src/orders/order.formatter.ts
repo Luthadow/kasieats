@@ -1,4 +1,5 @@
 import { Prisma } from '@kasieats/db';
+import { DELIVERY_FEE_SETTLEMENT_MODEL } from '@kasieats/shared';
 
 export type OrderWithDetails = Prisma.OrderGetPayload<{
   include: {
@@ -15,10 +16,36 @@ type OrderWithOptionalDelivery =
     });
 
 /**
+ * Mask bank account number — show only last 4 digits for customer safety.
+ * Full number retained at the merchant side; customers only need the last 4
+ * to confirm the transfer landed in the right account.
+ */
+function maskAccountNumber(accountNumber: string | null): string | null {
+  if (!accountNumber) return null;
+  if (accountNumber.length <= 4) return accountNumber;
+  return `****${accountNumber.slice(-4)}`;
+}
+
+/**
  * Shared serializer that converts a Prisma order (with vendor/items/delivery)
  * into the camelCase API shape used by every controller that returns orders.
+ *
+ * Includes merchant banking details for Model A EFT checkout display.
+ * Financial Ops Blueprint §Food Payment Flow / §Checkout display
  */
 export function formatOrder(order: OrderWithOptionalDelivery) {
+  const vendor = order.vendor as OrderWithDetails['vendor'] & {
+    bank_name?: string | null;
+    bank_account_holder?: string | null;
+    bank_account_number?: string | null;
+    bank_code?: string | null;
+  };
+
+  const hasBanking =
+    vendor.bank_account_number ||
+    vendor.bank_account_holder ||
+    vendor.bank_code;
+
   return {
     id: order.id,
     status: order.status,
@@ -31,6 +58,18 @@ export function formatOrder(order: OrderWithOptionalDelivery) {
     eftVerifiedByVendor: order.eft_verified_by_vendor,
     eftRejectionReason: order.eft_rejection_reason,
     deliveryPin: order.delivery_pin,
+    // Merchant banking block — customer pays food + delivery to merchant in one EFT (Model A)
+    merchantBanking: hasBanking
+      ? {
+          bankName: vendor.bank_name ?? null,
+          accountHolder: vendor.bank_account_holder ?? null,
+          accountNumberMasked: maskAccountNumber(vendor.bank_account_number ?? null),
+          branchCode: vendor.bank_code ?? null,
+        }
+      : null,
+    // Delivery fee settlement model annotation (informational)
+    deliveryFeeSettlement:
+      order.payment_method === 'eft' ? `merchant_collects_model_${DELIVERY_FEE_SETTLEMENT_MODEL}` : null,
     subtotal: Number(order.subtotal),
     deliveryFee: Number(order.delivery_fee),
     serviceFee: Number(order.service_fee),
@@ -47,8 +86,8 @@ export function formatOrder(order: OrderWithOptionalDelivery) {
     cancellationReason: order.cancellation_reason,
     rejectionReason: order.rejection_reason,
     vendor: {
-      id: order.vendor.id,
-      storeName: order.vendor.store_name,
+      id: vendor.id,
+      storeName: vendor.store_name,
     },
     items: order.order_items.map((item) => ({
       menuItemId: item.menu_item_id,
