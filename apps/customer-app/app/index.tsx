@@ -1,45 +1,70 @@
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { Link } from 'expo-router';
-import { apiRequest } from '../src/services/api';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link, router, useFocusEffect } from 'expo-router';
+import { apiData } from '../src/services/api';
+import { useAuth } from '../src/context/AuthContext';
+import { useCart } from '../src/context/CartContext';
+import { theme } from '../src/theme';
 import type { VendorSummary } from '@kasieats/shared';
 
+// Rustenburg township centre — matches seed vendor coordinates.
+const DEFAULT_LAT = -25.6544;
+const DEFAULT_LNG = 27.2389;
+
 export default function HomeScreen() {
+  const { user } = useAuth();
+  const { count } = useCart();
   const [vendors, setVendors] = useState<VendorSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiRequest<{ success: boolean; data: VendorSummary[] }>(
-      '/vendors?latitude=-25.6544&longitude=27.2389&openNow=true',
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    apiData<VendorSummary[]>(
+      `/vendors?lat=${DEFAULT_LAT}&lng=${DEFAULT_LNG}&radiusKm=15&openNow=true`,
     )
-      .then((response) => setVendors(response.data))
+      .then((data) => setVendors(data ?? []))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Township flavour, delivered</Text>
         <Text style={styles.heroSubtitle}>
-          Discover kota stands, shisanyama and home kitchens near you.
+          Kotas, shisanyama and home kitchens near you.
         </Text>
-        <Link href="/login" asChild>
-          <Pressable style={styles.loginButton}>
-            <Text style={styles.loginButtonText}>Sign in with phone</Text>
+        <View style={styles.heroActions}>
+          {user ? (
+            <Pressable style={styles.heroBtn} onPress={() => router.push('/orders')}>
+              <Text style={styles.heroBtnText}>My orders</Text>
+            </Pressable>
+          ) : (
+            <Link href="/login" asChild>
+              <Pressable style={styles.heroBtn}>
+                <Text style={styles.heroBtnText}>Sign in with phone</Text>
+              </Pressable>
+            </Link>
+          )}
+          <Pressable
+            style={[styles.heroBtn, styles.heroBtnGhost]}
+            onPress={() => router.push('/cart')}
+          >
+            <Text style={styles.heroBtnGhostText}>Cart{count ? ` (${count})` : ''}</Text>
           </Pressable>
-        </Link>
+        </View>
+        {user ? <Text style={styles.greeting}>Sawubona, {user.firstName} 👋</Text> : null}
       </View>
 
-      {loading && <ActivityIndicator size="large" color="#f97316" />}
+      {loading && <ActivityIndicator size="large" color={theme.brand} style={{ marginTop: 24 }} />}
       {error && <Text style={styles.error}>{error}</Text>}
 
       <FlatList
@@ -62,7 +87,9 @@ export default function HomeScreen() {
           </Link>
         )}
         ListEmptyComponent={
-          !loading ? <Text style={styles.empty}>No vendors found nearby yet.</Text> : null
+          !loading && !error ? (
+            <Text style={styles.empty}>No vendors open nearby right now.</Text>
+          ) : null
         }
       />
     </View>
@@ -72,36 +99,39 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   hero: {
-    backgroundColor: '#0f172a',
+    backgroundColor: theme.brand,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
   },
-  heroTitle: { color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 8 },
-  heroSubtitle: { color: '#cbd5e1', marginBottom: 16, lineHeight: 20 },
-  loginButton: {
-    backgroundColor: '#f97316',
+  heroTitle: { color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 6 },
+  heroSubtitle: { color: '#FFE9D6', marginBottom: 16, lineHeight: 20 },
+  heroActions: { flexDirection: 'row', gap: 10 },
+  heroBtn: {
+    backgroundColor: '#fff',
     paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
-  loginButtonText: { color: '#fff', fontWeight: '700' },
+  heroBtnText: { color: theme.brandDark, fontWeight: '800' },
+  heroBtnGhost: { backgroundColor: 'rgba(255,255,255,0.18)' },
+  heroBtnGhostText: { color: '#fff', fontWeight: '800' },
+  greeting: { color: '#FFE9D6', marginTop: 14, fontWeight: '600' },
   list: { gap: 12, paddingBottom: 24 },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  cardTitle: { fontSize: 18, fontWeight: '700', flex: 1 },
+  cardTitle: { fontSize: 18, fontWeight: '700', flex: 1, color: theme.text },
   badge: {
-    backgroundColor: '#fff7ed',
-    color: '#c2410c',
+    backgroundColor: theme.badgeBg,
+    color: theme.badgeText,
     overflow: 'hidden',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -109,8 +139,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  meta: { color: '#64748b', marginTop: 8 },
-  address: { color: '#334155', marginTop: 4 },
-  error: { color: '#dc2626', marginBottom: 12 },
-  empty: { textAlign: 'center', color: '#64748b', marginTop: 24 },
+  meta: { color: theme.muted, marginTop: 8 },
+  address: { color: '#4B5563', marginTop: 4 },
+  error: { color: theme.danger, marginTop: 16, textAlign: 'center' },
+  empty: { textAlign: 'center', color: theme.muted, marginTop: 24 },
 });
