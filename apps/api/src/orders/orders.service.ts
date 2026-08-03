@@ -11,19 +11,22 @@ import {
 } from '@kasieats/shared';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { formatOrder } from './order.formatter';
 
-type OrderWithDetails = Prisma.OrderGetPayload<{
-  include: {
-    vendor: true;
-    order_items: { include: { menu_item: true } };
-    delivery: { include: { driver: true } };
-  };
-}>;
+const ORDER_INCLUDE = {
+  vendor: true,
+  order_items: { include: { menu_item: true } },
+  delivery: { include: { driver: true } },
+} satisfies Prisma.OrderInclude;
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async createOrder(customerUserId: string, dto: CreateOrderDto) {
     const customer = await this.prisma.customer.findUnique({
@@ -39,12 +42,13 @@ export class OrdersService {
       throw new NotFoundException('Vendor not available');
     }
 
-    const menuItemIds = dto.items.map((i) => i.menuItemId);
+    // Deduplicate menu item ids for validation lookup.
+    const uniqueMenuItemIds = [...new Set(dto.items.map((i) => i.menuItemId))];
     const menuItems = await this.prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds }, vendor_id: vendor.id, is_available: true },
+      where: { id: { in: uniqueMenuItemIds }, vendor_id: vendor.id, is_available: true },
     });
 
-    if (menuItems.length !== menuItemIds.length) {
+    if (menuItems.length !== uniqueMenuItemIds.length) {
       throw new BadRequestException('One or more menu items are unavailable');
     }
 
@@ -53,21 +57,27 @@ export class OrdersService {
     let subtotal = 0;
     const orderItemsData = dto.items.map((item) => {
       const menuItem = itemMap.get(item.menuItemId)!;
-      const extrasTotal =
-        item.extras?.reduce((sum, extra) => sum + extra.price, 0) ?? 0;
-      const lineTotal = (Number(menuItem.price) + extrasTotal) * item.quantity;
+      // For MVP we do not trust extra prices sent by the client. Extras are
+      // recorded (by name) but never affect pricing.
+      const extrasTotal = 0;
+      const sanitizedExtras = (item.extras ?? []).map((extra) => ({
+        name: extra.name,
+        price: 0,
+      }));
+      const lineTotal = Number(menuItem.price) * item.quantity;
       subtotal += lineTotal;
 
       return {
         menu_item_id: menuItem.id,
         quantity: item.quantity,
         price_per_item: Number(menuItem.price),
-        extras: item.extras ?? [],
+        extras: sanitizedExtras,
         extras_total: extrasTotal,
         special_instructions: item.specialInstructions,
       };
     });
 
+    subtotal = Math.round(subtotal * 100) / 100;
     const deliveryFee = DEFAULT_DELIVERY_FEE_ZAR;
     const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE * 100) / 100;
     const commissionRate = Number(vendor.commission_rate) / 100 || PLATFORM_COMMISSION_RATE;
@@ -85,7 +95,7 @@ export class OrdersService {
         commission_rate: commissionRate * 100,
         vendor_payout: vendorPayout,
         payment_method: dto.paymentMethod,
-        payment_status: dto.paymentMethod === 'cash' ? 'pending' : 'processing',
+        payment_status: dto.paymentMethod === 'cash' ? 'pending' : 'pending',
         status: 'pending',
         delivery_address: dto.deliveryAddress,
         delivery_latitude: dto.deliveryLatitude,
@@ -106,19 +116,24 @@ export class OrdersService {
           create: {
             amount: totalAmount,
             payment_method: dto.paymentMethod,
-            status: dto.paymentMethod === 'cash' ? 'pending' : 'processing',
+            status: 'pending',
           },
         },
       },
-      include: {
-        order_items: { include: { menu_item: true } },
-        vendor: true,
-      },
+      include: ORDER_INCLUDE,
     });
+
+    await this.notifications.createNotification(
+      vendor.user_id,
+      'New order received',
+      `You have a new order for R${totalAmount.toFixed(2)}.`,
+      'order_placed',
+      { relatedOrderId: order.id },
+    );
 
     return {
       success: true,
-      data: this.formatOrder(order),
+      data: formatOrder(order),
     };
   }
 
@@ -133,14 +148,14 @@ export class OrdersService {
 
     const orders = await this.prisma.order.findMany({
       where: { customer_id: customer.id },
-      include: { vendor: true, order_items: { include: { menu_item: true } } },
+      include: ORDER_INCLUDE,
       orderBy: { created_at: 'desc' },
       take: 50,
     });
 
     return {
       success: true,
-      data: orders.map((order) => this.formatOrder(order)),
+      data: orders.map((order) => formatOrder(order)),
     };
   }
 
@@ -155,55 +170,194 @@ export class OrdersService {
 
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, customer_id: customer.id },
-      include: {
-        vendor: true,
-        order_items: { include: { menu_item: true } },
-        delivery: { include: { driver: true } },
-      },
+      include: ORDER_INCLUDE,
     });
 
     if (!order) {
       throw new NotFoundException('Order not found');
     }
 
-    return { success: true, data: this.formatOrder(order) };
+    return { success: true, data: formatOrder(order) };
   }
 
-  private formatOrder(order: OrderWithDetails | Omit<OrderWithDetails, 'delivery'> & { delivery?: OrderWithDetails['delivery'] | null }) {
-    return {
-      id: order.id,
-      status: order.status,
-      paymentStatus: order.payment_status,
-      subtotal: Number(order.subtotal),
-      deliveryFee: Number(order.delivery_fee),
-      serviceFee: Number(order.service_fee),
-      totalAmount: Number(order.total_amount),
-      deliveryAddress: order.delivery_address,
-      specialInstructions: order.special_instructions,
-      estimatedDeliveryMinutes: order.estimated_delivery_minutes,
-      createdAt: order.created_at,
-      vendor: {
-        id: order.vendor.id,
-        storeName: order.vendor.store_name,
+  async cancelOrder(customerUserId: string, orderId: string, reason?: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { user_id: customerUserId },
+    });
+    if (!customer) {
+      throw new ForbiddenException();
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customer_id: customer.id },
+      include: { vendor: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (!['pending', 'accepted'].includes(order.status)) {
+      throw new BadRequestException('Order can no longer be cancelled');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: 'cancelled',
+        cancelled_at: new Date(),
+        cancellation_reason: reason ?? 'Cancelled by customer',
       },
-      items: order.order_items.map((item) => ({
-        name: item.menu_item.name,
-        quantity: item.quantity,
-        pricePerItem: Number(item.price_per_item),
-        extrasTotal: Number(item.extras_total),
-        specialInstructions: item.special_instructions,
-      })),
-      delivery: order.delivery
-        ? {
-            status: order.delivery.status,
-            driver: order.delivery.driver
-              ? {
-                  name: `${order.delivery.driver.first_name} ${order.delivery.driver.last_name}`,
-                  rating: Number(order.delivery.driver.average_rating),
-                }
-              : null,
-          }
-        : null,
-    };
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifications.createNotification(
+      order.vendor.user_id,
+      'Order cancelled',
+      'A customer cancelled their order.',
+      'order_cancelled',
+      { relatedOrderId: order.id },
+    );
+
+    return { success: true, data: formatOrder(updated) };
+  }
+
+  async getVendorInbox(vendorUserId: string, status?: string) {
+    const vendor = await this.getVendorByUser(vendorUserId);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        vendor_id: vendor.id,
+        ...(status && { status }),
+      },
+      include: ORDER_INCLUDE,
+      orderBy: { created_at: 'desc' },
+      take: 100,
+    });
+
+    return { success: true, data: orders.map((order) => formatOrder(order)) };
+  }
+
+  async acceptOrder(vendorUserId: string, orderId: string) {
+    const order = await this.getVendorOrder(vendorUserId, orderId);
+    if (order.status !== 'pending') {
+      throw new BadRequestException('Only pending orders can be accepted');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'accepted', accepted_by_vendor_at: new Date() },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifyCustomer(order.customer_id, order.id, 'Order accepted', 'The vendor accepted your order and will start preparing it.');
+
+    return { success: true, data: formatOrder(updated) };
+  }
+
+  async rejectOrder(vendorUserId: string, orderId: string, reason?: string) {
+    const order = await this.getVendorOrder(vendorUserId, orderId);
+    if (!['pending', 'accepted'].includes(order.status)) {
+      throw new BadRequestException('Order can no longer be rejected');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: 'rejected',
+        rejection_reason: reason ?? 'Rejected by vendor',
+        cancelled_at: new Date(),
+      },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifyCustomer(order.customer_id, order.id, 'Order rejected', 'Unfortunately the vendor could not accept your order.');
+
+    return { success: true, data: formatOrder(updated) };
+  }
+
+  async markPreparing(vendorUserId: string, orderId: string) {
+    const order = await this.getVendorOrder(vendorUserId, orderId);
+    if (!['accepted', 'preparing'].includes(order.status)) {
+      throw new BadRequestException('Order must be accepted before preparing');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'preparing' },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifyCustomer(order.customer_id, order.id, 'Order being prepared', 'The vendor is preparing your order.');
+
+    return { success: true, data: formatOrder(updated) };
+  }
+
+  async markReady(vendorUserId: string, orderId: string) {
+    const order = await this.getVendorOrder(vendorUserId, orderId);
+    if (!['accepted', 'preparing'].includes(order.status)) {
+      throw new BadRequestException('Order must be accepted/preparing before it can be ready');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: order.id },
+      data: { status: 'ready', marked_as_ready_at: new Date() },
+      include: ORDER_INCLUDE,
+    });
+
+    await this.notifyCustomer(order.customer_id, order.id, 'Order ready', 'Your order is ready and waiting for a driver.');
+    await this.notifyAvailableDrivers(order.id, updated.vendor.store_name);
+
+    return { success: true, data: formatOrder(updated) };
+  }
+
+  private async notifyAvailableDrivers(orderId: string, storeName: string) {
+    const drivers = await this.prisma.driver.findMany({
+      where: { status: 'active', is_online: true },
+      select: { user_id: true },
+      take: 50,
+    });
+
+    await Promise.all(
+      drivers.map((driver) =>
+        this.notifications.createNotification(
+          driver.user_id,
+          'New delivery available',
+          `An order from ${storeName} is ready for pickup.`,
+          'delivery_available',
+          { relatedOrderId: orderId },
+        ),
+      ),
+    );
+  }
+
+  private async notifyCustomer(customerId: string, orderId: string, title: string, message: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { user_id: true },
+    });
+    if (customer) {
+      await this.notifications.createNotification(customer.user_id, title, message, 'order_update', {
+        relatedOrderId: orderId,
+      });
+    }
+  }
+
+  private async getVendorByUser(vendorUserId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { user_id: vendorUserId } });
+    if (!vendor) {
+      throw new ForbiddenException('No vendor profile for this account');
+    }
+    return vendor;
+  }
+
+  private async getVendorOrder(vendorUserId: string, orderId: string) {
+    const vendor = await this.getVendorByUser(vendorUserId);
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, vendor_id: vendor.id },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return order;
   }
 }
