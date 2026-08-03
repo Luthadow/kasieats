@@ -2,6 +2,17 @@
 
 Township food delivery platform connecting customers, vendors, and drivers across South Africa.
 
+## Business model
+
+KasiEats is a **coordination marketplace**, not a payment processor for food orders.
+
+| Money flow | Who handles it |
+|---|---|
+| Food order totals, delivery tips | Customer ↔ vendor / driver **directly** (outside the app) |
+| Platform revenue | **Vendor subscription only — R350 / month** (Ozow when live; sandbox mock today) |
+
+Orders still show item totals and a suggested delivery amount for clarity, but KasiEats never charges cards for meals and takes **no commission** on orders.
+
 ## Services
 
 | Service | URL | Description |
