@@ -7,11 +7,16 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
+import { useAuth } from '../src/context/AuthContext';
+import { useCart } from '../src/context/CartContext';
 import { apiRequest } from '../src/services/api';
 import type { VendorSummary } from '@kasieats/shared';
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { itemCount } = useCart();
   const [vendors, setVendors] = useState<VendorSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +37,20 @@ export default function HomeScreen() {
         <Text style={styles.heroSubtitle}>
           Discover kota stands, shisanyama and home kitchens near you.
         </Text>
-        <Link href="/login" asChild>
-          <Pressable style={styles.loginButton}>
-            <Text style={styles.loginButtonText}>Sign in with phone</Text>
-          </Pressable>
-        </Link>
+        <View style={styles.heroActions}>
+          <Link href={user ? '/orders' : '/login'} asChild>
+            <Pressable style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>
+                {user ? 'My orders' : 'Sign in with phone'}
+              </Text>
+            </Pressable>
+          </Link>
+          {itemCount > 0 && (
+            <Pressable style={styles.loginButton} onPress={() => router.push('/cart')}>
+              <Text style={styles.loginButtonText}>Cart ({itemCount})</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {loading && <ActivityIndicator size="large" color="#f97316" />}
@@ -79,6 +93,15 @@ const styles = StyleSheet.create({
   },
   heroTitle: { color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 8 },
   heroSubtitle: { color: '#cbd5e1', marginBottom: 16, lineHeight: 20 },
+  heroActions: { gap: 10 },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: '#475569',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  secondaryButtonText: { color: '#fff', fontWeight: '700' },
   loginButton: {
     backgroundColor: '#f97316',
     paddingVertical: 12,

@@ -70,9 +70,10 @@ export class AuthService {
     }
 
     const customer = await this.prisma.customer.findUnique({ where: { user_id: user.id } });
-    const needsProfile = !customer;
+    const vendor = await this.prisma.vendor.findUnique({ where: { user_id: user.id } });
+    const driver = await this.prisma.driver.findUnique({ where: { user_id: user.id } });
 
-    if (needsProfile) {
+    if (user.user_type === 'customer' && !customer) {
       return {
         success: true,
         needsProfile: true,
@@ -83,18 +84,51 @@ export class AuthService {
 
     const token = await this.signToken(user.id, user.phone, user.user_type as JwtPayload['userType']);
 
-    return {
-      success: true,
-      needsProfile: false,
-      token,
-      user: {
-        id: user.id,
-        phone: user.phone,
-        userType: user.user_type,
-        firstName: customer!.first_name,
-        lastName: customer!.last_name,
-      },
-    };
+    if (user.user_type === 'vendor' && vendor) {
+      return {
+        success: true,
+        needsProfile: false,
+        token,
+        user: {
+          id: user.id,
+          phone: user.phone,
+          userType: user.user_type,
+          storeName: vendor.store_name,
+        },
+      };
+    }
+
+    if (user.user_type === 'driver' && driver) {
+      return {
+        success: true,
+        needsProfile: false,
+        token,
+        user: {
+          id: user.id,
+          phone: user.phone,
+          userType: user.user_type,
+          firstName: driver.first_name,
+          lastName: driver.last_name,
+        },
+      };
+    }
+
+    if (customer) {
+      return {
+        success: true,
+        needsProfile: false,
+        token,
+        user: {
+          id: user.id,
+          phone: user.phone,
+          userType: user.user_type,
+          firstName: customer.first_name,
+          lastName: customer.last_name,
+        },
+      };
+    }
+
+    throw new UnauthorizedException('Account setup incomplete');
   }
 
   async completeProfile(userId: string, dto: CompleteProfileDto) {

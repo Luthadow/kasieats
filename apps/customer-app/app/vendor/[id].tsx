@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { apiRequest } from '../../src/services/api';
+import { useCart } from '../../src/context/CartContext';
 import type { MenuItemDto } from '@kasieats/shared';
 
 interface VendorDetail {
@@ -21,6 +23,8 @@ interface VendorDetail {
 
 export default function VendorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { addItem, vendorId, itemCount, clearCart } = useCart();
   const [vendor, setVendor] = useState<VendorDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,6 +34,38 @@ export default function VendorScreen() {
       .then((response) => setVendor(response.data))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleAdd = (item: MenuItemDto) => {
+    if (!vendor) return;
+
+    if (vendorId && vendorId !== vendor.id) {
+      Alert.alert(
+        'Replace cart?',
+        'Your cart has items from another vendor. Clear it and add from this store?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Replace',
+            onPress: () => {
+              clearCart();
+              addItem(vendor.id, vendor.storeName, {
+                menuItemId: item.id,
+                name: item.name,
+                price: item.price,
+              });
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    addItem(vendor.id, vendor.storeName, {
+      menuItemId: item.id,
+      name: item.name,
+      price: item.price,
+    });
+  };
 
   if (loading) {
     return (
@@ -56,6 +92,7 @@ export default function VendorScreen() {
       <FlatList
         data={vendor.menuItems}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => (
           <View style={styles.itemCard}>
             <View style={{ flex: 1 }}>
@@ -64,13 +101,19 @@ export default function VendorScreen() {
             </View>
             <View style={styles.itemActions}>
               <Text style={styles.price}>R{item.price}</Text>
-              <Pressable style={styles.addButton}>
+              <Pressable style={styles.addButton} onPress={() => handleAdd(item)}>
                 <Text style={styles.addButtonText}>Add</Text>
               </Pressable>
             </View>
           </View>
         )}
       />
+
+      {itemCount > 0 && (
+        <Pressable style={styles.cartBar} onPress={() => router.push('/cart')}>
+          <Text style={styles.cartBarText}>View cart ({itemCount})</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -100,4 +143,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addButtonText: { color: '#fff', fontWeight: '700' },
+  cartBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    backgroundColor: '#f97316',
+    padding: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  cartBarText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });
