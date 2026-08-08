@@ -12,6 +12,8 @@ import {
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PromotionsService } from '../promotions/promotions.service';
+import { OrderEventsService } from '../realtime/order-events.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 
@@ -28,6 +30,8 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly promotionsService: PromotionsService,
+    private readonly orderEvents: OrderEventsService,
   ) {}
 
   async createOrder(customerUserId: string, dto: CreateOrderDto) {
@@ -43,6 +47,8 @@ export class OrdersService {
     if (!vendor || vendor.status !== 'active') {
       throw new NotFoundException('Vendor not available');
     }
+
+    const vendorUserId = vendor.user_id;
 
     const menuItemIds = dto.items.map((i) => i.menuItemId);
     const menuItems = await this.prisma.menuItem.findMany({
@@ -75,9 +81,25 @@ export class OrdersService {
 
     const deliveryFee = DEFAULT_DELIVERY_FEE_ZAR;
     const serviceFee = Math.round(subtotal * SERVICE_FEE_RATE * 100) / 100;
+
+    let discountAmount = 0;
+    let promotionCode: string | undefined;
+
+    if (dto.promoCode) {
+      const promo = await this.promotionsService.applyPromotionCode(
+        dto.promoCode,
+        vendor.id,
+        subtotal,
+        customer.id,
+      );
+      discountAmount = promo.discountAmount;
+      promotionCode = promo.code;
+    }
+
+    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
     const commissionRate = Number(vendor.commission_rate) / 100 || PLATFORM_COMMISSION_RATE;
-    const vendorPayout = Math.round(subtotal * (1 - commissionRate) * 100) / 100;
-    const totalAmount = Math.round((subtotal + deliveryFee + serviceFee) * 100) / 100;
+    const vendorPayout = Math.round(discountedSubtotal * (1 - commissionRate) * 100) / 100;
+    const totalAmount = Math.round((discountedSubtotal + deliveryFee + serviceFee) * 100) / 100;
 
     const order = await this.prisma.order.create({
       data: {
@@ -86,11 +108,14 @@ export class OrdersService {
         subtotal,
         delivery_fee: deliveryFee,
         service_fee: serviceFee,
+        discount_amount: discountAmount,
+        promotion_code: promotionCode,
         total_amount: totalAmount,
         commission_rate: commissionRate * 100,
         vendor_payout: vendorPayout,
         payment_method: dto.paymentMethod,
-        payment_status: dto.paymentMethod === 'cash' ? 'pending' : 'processing',
+        payment_status:
+          dto.paymentMethod === 'cash' ? 'pending' : 'processing',
         status: 'pending',
         delivery_address: dto.deliveryAddress,
         delivery_latitude: dto.deliveryLatitude,
@@ -136,6 +161,12 @@ export class OrdersService {
       notificationType: 'order_placed',
       relatedOrderId: order.id,
     });
+
+    if (promotionCode) {
+      await this.promotionsService.incrementUsage(promotionCode);
+    }
+
+    this.orderEvents.emitOrderUpdate(order.id, 'pending', vendorUserId, customerUserId);
 
     return {
       success: true,
@@ -373,6 +404,8 @@ export class OrdersService {
       subtotal: Number(order.subtotal),
       deliveryFee: Number(order.delivery_fee),
       serviceFee: Number(order.service_fee),
+      discountAmount: Number(order.discount_amount),
+      promotionCode: order.promotion_code,
       totalAmount: Number(order.total_amount),
       deliveryAddress: order.delivery_address,
       specialInstructions: order.special_instructions,

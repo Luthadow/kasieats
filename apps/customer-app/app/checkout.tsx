@@ -15,7 +15,7 @@ import { useAuth } from '../src/context/AuthContext';
 import { useCart } from '../src/context/CartContext';
 import { apiRequest } from '../src/services/api';
 
-type PaymentMethod = 'cash' | 'card';
+type PaymentMethod = 'cash' | 'card' | 'ozow';
 
 interface SavedAddress {
   id: string;
@@ -37,6 +37,9 @@ export default function CheckoutScreen() {
   const [deliveryLongitude, setDeliveryLongitude] = useState(27.2389);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [promoCode, setPromoCode] = useState('');
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoLabel, setPromoLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -61,6 +64,32 @@ export default function CheckoutScreen() {
     setDeliveryLatitude(address.latitude);
     setDeliveryLongitude(address.longitude);
   };
+
+  const applyPromo = async () => {
+    if (!token || !vendorId || !promoCode.trim()) return;
+    try {
+      const response = await apiRequest<{
+        success: boolean;
+        data: { discountAmount: number; name: string; code: string };
+      }>(
+        '/promotions/validate',
+        {
+          method: 'POST',
+          body: JSON.stringify({ code: promoCode.trim(), vendorId, subtotal }),
+        },
+        token,
+      );
+      setPromoDiscount(response.data.discountAmount);
+      setPromoLabel(response.data.name);
+      Alert.alert('Promo applied', `${response.data.name} — R${response.data.discountAmount.toFixed(2)} off`);
+    } catch (error) {
+      setPromoDiscount(0);
+      setPromoLabel(null);
+      Alert.alert('Invalid promo', error instanceof Error ? error.message : 'Code not valid');
+    }
+  };
+
+  const checkoutTotal = Math.max(0, total - promoDiscount);
 
   if (!token || !user) {
     return (
@@ -102,6 +131,7 @@ export default function CheckoutScreen() {
             deliveryLongitude,
             specialInstructions: specialInstructions || undefined,
             paymentMethod,
+            promoCode: promoDiscount > 0 ? promoCode.trim().toUpperCase() : undefined,
           }),
         },
         token,
@@ -109,7 +139,7 @@ export default function CheckoutScreen() {
 
       const orderId = response.data.id;
 
-      if (paymentMethod === 'card') {
+      if (paymentMethod === 'card' || paymentMethod === 'ozow') {
         const payment = await apiRequest<{
           success: boolean;
           data: {
@@ -122,7 +152,10 @@ export default function CheckoutScreen() {
           '/payments/initiate',
           {
             method: 'POST',
-            body: JSON.stringify({ orderId, provider: 'yoco' }),
+            body: JSON.stringify({
+              orderId,
+              provider: paymentMethod === 'ozow' ? 'ozow' : 'yoco',
+            }),
           },
           token,
         );
@@ -139,7 +172,7 @@ export default function CheckoutScreen() {
         } else if (payment.data.paymentUrl) {
           Alert.alert(
             'Complete payment',
-            payment.data.instructions ?? 'Open the payment link to complete your card payment.',
+            payment.data.instructions ?? 'Open the payment link to complete payment.',
           );
         }
       }
@@ -211,9 +244,28 @@ export default function CheckoutScreen() {
         multiline
       />
 
+      <Text style={styles.label}>Promo code</Text>
+      <View style={styles.promoRow}>
+        <TextInput
+          style={[styles.input, styles.promoInput]}
+          value={promoCode}
+          onChangeText={setPromoCode}
+          placeholder="KASI10"
+          autoCapitalize="characters"
+        />
+        <Pressable style={styles.promoButton} onPress={applyPromo}>
+          <Text style={styles.promoButtonText}>Apply</Text>
+        </Pressable>
+      </View>
+      {promoLabel && (
+        <Text style={styles.promoApplied}>
+          {promoLabel} applied · R{promoDiscount.toFixed(2)} off
+        </Text>
+      )}
+
       <Text style={styles.label}>Payment method</Text>
       <View style={styles.paymentRow}>
-        {(['cash', 'card'] as PaymentMethod[]).map((method) => (
+        {(['cash', 'card', 'ozow'] as PaymentMethod[]).map((method) => (
           <Pressable
             key={method}
             style={[styles.paymentOption, paymentMethod === method && styles.paymentOptionActive]}
@@ -225,7 +277,7 @@ export default function CheckoutScreen() {
                 paymentMethod === method && styles.paymentOptionTextActive,
               ]}
             >
-              {method === 'cash' ? 'Cash on delivery' : 'Card'}
+              {method === 'cash' ? 'Cash' : method === 'card' ? 'Card' : 'Ozow EFT'}
             </Text>
           </Pressable>
         ))}
@@ -244,9 +296,15 @@ export default function CheckoutScreen() {
           <Text>Service fee</Text>
           <Text>R{serviceFee.toFixed(2)}</Text>
         </View>
+        {promoDiscount > 0 && (
+          <View style={styles.itemRow}>
+            <Text>Promo discount</Text>
+            <Text style={styles.discount}>-R{promoDiscount.toFixed(2)}</Text>
+          </View>
+        )}
         <View style={[styles.itemRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>R{total.toFixed(2)}</Text>
+          <Text style={styles.totalValue}>R{checkoutTotal.toFixed(2)}</Text>
         </View>
       </View>
 
@@ -258,14 +316,16 @@ export default function CheckoutScreen() {
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.primaryButtonText}>Place order · R{total.toFixed(2)}</Text>
+          <Text style={styles.primaryButtonText}>Place order · R{checkoutTotal.toFixed(2)}</Text>
         )}
       </Pressable>
 
       <Text style={styles.hint}>
         {paymentMethod === 'card'
           ? 'Card payments use Yoco sandbox — charged instantly in dev.'
-          : `Status after placing: ${ORDER_STATUS_LABELS.pending}`}
+          : paymentMethod === 'ozow'
+            ? 'Ozow EFT sandbox — payment auto-confirms in dev.'
+            : `Status after placing: ${ORDER_STATUS_LABELS.pending}`}
       </Text>
     </ScrollView>
   );
@@ -307,9 +367,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
-  paymentRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  paymentRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
   paymentOption: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: '30%',
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,
@@ -320,6 +381,17 @@ const styles = StyleSheet.create({
   paymentOptionActive: { borderColor: '#f97316', backgroundColor: '#fff7ed' },
   paymentOptionText: { fontWeight: '600' },
   paymentOptionTextActive: { color: '#c2410c' },
+  promoRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  promoInput: { flex: 1, marginBottom: 0 },
+  promoButton: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    justifyContent: 'center',
+  },
+  promoButtonText: { color: '#fff', fontWeight: '800' },
+  promoApplied: { color: '#16a34a', fontWeight: '700', marginBottom: 16 },
+  discount: { color: '#16a34a', fontWeight: '700' },
   totalRow: { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 12 },
   totalLabel: { fontWeight: '800' },
   totalValue: { fontWeight: '800' },

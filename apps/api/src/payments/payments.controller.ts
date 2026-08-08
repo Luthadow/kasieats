@@ -25,7 +25,20 @@ export class PaymentsController {
   }
 
   @Post('webhook/:provider')
-  webhook(@Param('provider') provider: string, @Body() dto: PaymentWebhookDto) {
-    return this.paymentsService.handleWebhook(provider, dto.transactionReference, dto.status);
+  webhook(
+    @Param('provider') provider: string,
+    @Body() dto: PaymentWebhookDto,
+    @Req() req: { headers: Record<string, string | undefined> },
+  ) {
+    const signature =
+      req.headers['x-yoco-signature'] ??
+      req.headers['x-ozow-signature'] ??
+      req.headers['authorization'];
+    return this.paymentsService.handleWebhook(
+      provider,
+      dto.transactionReference,
+      dto.status,
+      signature,
+    );
   }
 }

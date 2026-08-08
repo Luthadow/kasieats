@@ -57,6 +57,23 @@ Approved vendors manage their menu at http://localhost:3001/menu
 - Manage at `/addresses` in the customer app
 - Saved addresses appear at checkout
 
+## Promotions
+
+- Seed promo: **KASI10** (10% off, min R50 order)
+- Admin creates/manages codes at http://localhost:3002/promotions
+- Customers apply at checkout
+
+## Support
+
+- Customer app `/support` — submit tickets
+- Admin resolves at http://localhost:3002/support
+
+## Real-time updates
+
+WebSocket namespace: `ws://localhost:3000/orders`
+
+Clients emit `subscribe` with `{ userId, orderId }` to join rooms. Events: `order:update`.
+
 ## Commission model
 
 - Platform fee: 15% of subtotal (via service fee)

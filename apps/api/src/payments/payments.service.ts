@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfirmPaymentDto, InitiatePaymentDto, PaymentProvider } from './dto/payment.dto';
 
@@ -33,8 +34,8 @@ export class PaymentsService {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.payment_method !== 'card') {
-      throw new BadRequestException('Order is not a card payment');
+    if (order.payment_method !== 'card' && order.payment_method !== 'ozow') {
+      throw new BadRequestException('Order is not an online payment');
     }
 
     if (order.payment_status === 'paid') {
@@ -123,7 +124,9 @@ export class PaymentsService {
     };
   }
 
-  async handleWebhook(provider: string, reference: string, status: string) {
+  async handleWebhook(provider: string, reference: string, status: string, signature?: string) {
+    this.verifyWebhookSignature(provider, reference, status, signature);
+
     const payment = await this.prisma.payment.findFirst({
       where: { transaction_reference: reference },
     });
@@ -174,5 +177,37 @@ export class PaymentsService {
         ? 'Sandbox mode: call /payments/confirm after initiate'
         : 'Use Yoco Web SDK with the public key',
     };
+  }
+
+  private verifyWebhookSignature(
+    provider: string,
+    reference: string,
+    status: string,
+    signature?: string,
+  ) {
+    const isSandbox = this.configService.get<string>('PAYMENTS_SANDBOX', 'true') === 'true';
+    if (isSandbox) {
+      return;
+    }
+
+    const secret =
+      provider === 'ozow'
+        ? this.configService.get<string>('OZOW_PRIVATE_KEY')
+        : this.configService.get<string>('YOCO_SECRET_KEY');
+
+    if (!secret) {
+      throw new BadRequestException('Payment webhook secret not configured');
+    }
+
+    if (!signature) {
+      throw new BadRequestException('Missing webhook signature');
+    }
+
+    const payload = `${reference}:${status}:${provider}`;
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+    if (signature !== expected && signature !== `sha256=${expected}`) {
+      throw new BadRequestException('Invalid webhook signature');
+    }
   }
 }

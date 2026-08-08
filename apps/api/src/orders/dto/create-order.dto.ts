@@ -81,7 +81,12 @@ export class CreateOrderDto {
   @IsString()
   specialInstructions?: string;
 
-  @ApiProperty({ enum: ['card', 'cash'] })
-  @IsEnum(['card', 'cash'])
-  paymentMethod!: 'card' | 'cash';
+  @ApiProperty({ enum: ['card', 'cash', 'ozow'] })
+  @IsEnum(['card', 'cash', 'ozow'])
+  paymentMethod!: 'card' | 'cash' | 'ozow';
+
+  @ApiPropertyOptional({ example: 'KASI10' })
+  @IsOptional()
+  @IsString()
+  promoCode?: string;
 }

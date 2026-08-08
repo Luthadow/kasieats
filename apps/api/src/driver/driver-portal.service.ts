@@ -8,6 +8,7 @@ import { DRIVER_EARNINGS_SHARE } from '@kasieats/shared';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { OrderEventsService } from '../realtime/order-events.service';
 import { WalletService } from '../wallet/wallet.service';
 import {
   DriverDeliveryAction,
@@ -45,6 +46,7 @@ export class DriverPortalService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly walletService: WalletService,
+    private readonly orderEvents: OrderEventsService,
   ) {}
 
   async getDashboard(driverUserId: string) {
@@ -385,6 +387,24 @@ export class DriverPortalService {
         `Order #${updated.order_id.slice(-6)} was delivered successfully.`,
         'order_delivered',
         updated.order_id,
+      );
+
+      this.orderEvents.emitOrderUpdate(
+        updated.order_id,
+        'delivered',
+        vendor?.user_id,
+        updated.order.customer.user_id,
+        driver.user_id,
+      );
+    }
+
+    if (dto.action !== DriverDeliveryAction.COMPLETE) {
+      this.orderEvents.emitOrderUpdate(
+        updated.order_id,
+        updated.order.status,
+        updated.order.vendor.user_id,
+        updated.order.customer.user_id,
+        driver.user_id,
       );
     }
 

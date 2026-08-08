@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { OrderEventsService } from '../realtime/order-events.service';
 import { UpdateVendorOrderStatusDto, VendorOrderAction } from './dto/update-vendor-order-status.dto';
 import {
   CreateMenuItemDto,
@@ -26,6 +27,7 @@ export class VendorPortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly orderEvents: OrderEventsService,
   ) {}
 
   async getDashboard(vendorUserId: string) {
@@ -132,6 +134,13 @@ export class VendorPortalService {
         relatedOrderId: orderId,
       });
     }
+
+    this.orderEvents.emitOrderUpdate(
+      orderId,
+      updated.status,
+      vendor.user_id,
+      updated.customer.user_id,
+    );
 
     return {
       success: true,

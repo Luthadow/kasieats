@@ -13,6 +13,9 @@ import { AdminModule } from './admin/admin.module';
 import { SmsModule } from './sms/sms.module';
 import { WalletModule } from './wallet/wallet.module';
 import { CustomersModule } from './customers/customers.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { SupportModule } from './support/support.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -33,6 +36,9 @@ import { CustomersModule } from './customers/customers.module';
     PaymentsModule,
     AdminModule,
     CustomersModule,
+    PromotionsModule,
+    SupportModule,
+    RealtimeModule,
   ],
 })
 export class AppModule {}

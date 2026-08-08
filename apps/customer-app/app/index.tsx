@@ -52,6 +52,13 @@ export default function HomeScreen() {
               </Pressable>
             </Link>
           )}
+          {user && (
+            <Link href="/support" asChild>
+              <Pressable style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Help</Text>
+              </Pressable>
+            </Link>
+          )}
           {itemCount > 0 && (
             <Pressable style={styles.loginButton} onPress={() => router.push('/cart')}>
               <Text style={styles.loginButtonText}>Cart ({itemCount})</Text>

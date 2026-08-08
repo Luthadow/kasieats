@@ -23,6 +23,7 @@ export default function RootLayout() {
           <Stack.Screen name="order/[id]" options={{ title: 'Order Status' }} />
           <Stack.Screen name="orders" options={{ title: 'My Orders' }} />
           <Stack.Screen name="addresses" options={{ title: 'Saved Addresses' }} />
+          <Stack.Screen name="support" options={{ title: 'Help & Support' }} />
         </Stack>
       </CartProvider>
     </AuthProvider>

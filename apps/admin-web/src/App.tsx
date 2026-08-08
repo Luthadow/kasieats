@@ -6,6 +6,8 @@ import DriversPage from './pages/DriversPage';
 import LoginPage from './pages/LoginPage';
 import OrdersPage from './pages/OrdersPage';
 import WithdrawalsPage from './pages/WithdrawalsPage';
+import PromotionsPage from './pages/PromotionsPage';
+import SupportPage from './pages/SupportPage';
 import VendorsPage from './pages/VendorsPage';
 
 function ProtectedLayout() {
@@ -34,6 +36,8 @@ function ProtectedLayout() {
           <Link to="/drivers">Drivers</Link>
           <Link to="/orders">Orders</Link>
           <Link to="/withdrawals">Payouts</Link>
+          <Link to="/promotions">Promos</Link>
+          <Link to="/support">Support</Link>
         </nav>
         {unreadCount > 0 && (
           <div className="notification-panel">
@@ -62,6 +66,8 @@ function ProtectedLayout() {
           <Route path="/drivers" element={<DriversPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/withdrawals" element={<WithdrawalsPage />} />
+          <Route path="/promotions" element={<PromotionsPage />} />
+          <Route path="/support" element={<SupportPage />} />
         </Routes>
       </main>
     </div>

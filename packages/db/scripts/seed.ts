@@ -282,6 +282,29 @@ async function main() {
     },
   });
 
+  const promoStart = new Date();
+  const promoEnd = new Date();
+  promoEnd.setFullYear(promoEnd.getFullYear() + 1);
+
+  await prisma.promotion.upsert({
+    where: { code: 'KASI10' },
+    update: {},
+    create: {
+      code: 'KASI10',
+      name: 'Rustenburg Launch',
+      description: '10% off your order during the pilot',
+      discount_type: 'percentage',
+      discount_value: 10,
+      max_discount_amount: 30,
+      min_order_amount: 50,
+      start_date: promoStart,
+      end_date: promoEnd,
+      is_active: true,
+      max_usage_per_code: 10000,
+      max_usage_per_customer: 5,
+    },
+  });
+
   console.log('\n=== Rustenburg Pilot Seed Complete ===');
   console.log(`Admin: admin@kasieats.co.za / Admin123! (phone ${adminUser.phone})`);
   console.log(`Customer: 0761234567 · OTP 123456`);
@@ -291,6 +314,7 @@ async function main() {
   console.log('Vendor phones: 0831234567, 0841234567, 0861234567, 0871234567, 0881234567');
   console.log('Pending vendor phones: 0891234567, 0801234568');
   console.log('Pending driver: 0861234568');
+  console.log('Promo code: KASI10 (10% off, min R50 order)');
 }
 
 main()
