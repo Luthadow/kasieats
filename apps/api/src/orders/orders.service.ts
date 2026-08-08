@@ -13,6 +13,7 @@ import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateReviewDto } from './dto/create-review.dto';
 
 type OrderWithDetails = Prisma.OrderGetPayload<{
   include: {
@@ -233,6 +234,135 @@ export class OrdersService {
           : null,
       },
     };
+  }
+
+  async getOrderReviews(customerUserId: string, orderId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { user_id: customerUserId },
+    });
+
+    if (!customer) {
+      throw new ForbiddenException();
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customer_id: customer.id },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const reviews = await this.prisma.review.findMany({
+      where: { order_id: orderId },
+    });
+
+    return {
+      success: true,
+      data: reviews.map((r) => ({
+        id: r.id,
+        revieweeType: r.reviewee_type,
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: r.created_at,
+      })),
+    };
+  }
+
+  async submitReview(customerUserId: string, orderId: string, dto: CreateReviewDto) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { user_id: customerUserId },
+    });
+
+    if (!customer) {
+      throw new ForbiddenException();
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customer_id: customer.id },
+      include: { delivery: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status !== 'delivered') {
+      throw new BadRequestException('You can only review delivered orders');
+    }
+
+    if (dto.revieweeType === 'driver' && !order.driver_id) {
+      throw new BadRequestException('No driver assigned to this order');
+    }
+
+    const existing = await this.prisma.review.findFirst({
+      where: { order_id: orderId, reviewee_type: dto.revieweeType },
+    });
+
+    if (existing) {
+      throw new BadRequestException(`You already reviewed the ${dto.revieweeType} for this order`);
+    }
+
+    const review = await this.prisma.review.create({
+      data: {
+        order_id: orderId,
+        reviewer_id: customer.id,
+        reviewer_type: 'customer',
+        reviewee_type: dto.revieweeType,
+        vendor_id: dto.revieweeType === 'vendor' ? order.vendor_id : null,
+        driver_id: dto.revieweeType === 'driver' ? order.driver_id : null,
+        rating: dto.rating,
+        comment: dto.comment,
+      },
+    });
+
+    if (dto.revieweeType === 'vendor') {
+      await this.updateVendorRating(order.vendor_id);
+    } else if (order.driver_id) {
+      await this.updateDriverRating(order.driver_id);
+    }
+
+    return {
+      success: true,
+      data: {
+        id: review.id,
+        revieweeType: review.reviewee_type,
+        rating: review.rating,
+        comment: review.comment,
+      },
+    };
+  }
+
+  private async updateVendorRating(vendorId: string) {
+    const agg = await this.prisma.review.aggregate({
+      where: { vendor_id: vendorId, reviewee_type: 'vendor' },
+      _avg: { rating: true },
+      _count: true,
+    });
+
+    await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        average_rating: agg._avg.rating ?? 0,
+        rating_count: agg._count,
+      },
+    });
+  }
+
+  private async updateDriverRating(driverId: string) {
+    const agg = await this.prisma.review.aggregate({
+      where: { driver_id: driverId, reviewee_type: 'driver' },
+      _avg: { rating: true },
+      _count: true,
+    });
+
+    await this.prisma.driver.update({
+      where: { id: driverId },
+      data: {
+        average_rating: agg._avg.rating ?? 0,
+        rating_count: agg._count,
+      },
+    });
   }
 
   private formatOrder(order: OrderWithDetails | Omit<OrderWithDetails, 'delivery'> & { delivery?: OrderWithDetails['delivery'] | null }) {

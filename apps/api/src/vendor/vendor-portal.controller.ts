@@ -7,6 +7,11 @@ import type { AuthenticatedRequest } from '../auth/types';
 import { VendorPortalService } from './vendor-portal.service';
 import { UpdateVendorOrderStatusDto } from './dto/update-vendor-order-status.dto';
 import { ToggleStoreDto } from './dto/toggle-store.dto';
+import {
+  CreateMenuItemDto,
+  ToggleMenuItemDto,
+  UpdateMenuItemDto,
+} from './dto/menu-item.dto';
 
 @ApiTags('vendor')
 @Controller('vendor')
@@ -38,5 +43,38 @@ export class VendorPortalController {
   @Post('store/toggle')
   toggleStore(@Req() req: AuthenticatedRequest, @Body() dto: ToggleStoreDto) {
     return this.vendorPortalService.toggleStoreStatus(req.user.sub, dto.isOpen);
+  }
+
+  @Get('menu')
+  listMenu(@Req() req: AuthenticatedRequest) {
+    return this.vendorPortalService.listMenu(req.user.sub);
+  }
+
+  @Post('menu/items')
+  createMenuItem(@Req() req: AuthenticatedRequest, @Body() dto: CreateMenuItemDto) {
+    return this.vendorPortalService.createMenuItem(req.user.sub, dto);
+  }
+
+  @Patch('menu/items/:id')
+  updateMenuItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateMenuItemDto,
+  ) {
+    return this.vendorPortalService.updateMenuItem(req.user.sub, id, dto);
+  }
+
+  @Patch('menu/items/:id/toggle')
+  toggleMenuItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: ToggleMenuItemDto,
+  ) {
+    return this.vendorPortalService.toggleMenuItem(req.user.sub, id, dto);
+  }
+
+  @Post('menu/items/:id/delete')
+  deleteMenuItem(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.vendorPortalService.deleteMenuItem(req.user.sub, id);
   }
 }

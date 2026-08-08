@@ -5,6 +5,8 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AdminLoginDto } from '../admin/dto/admin.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
+import { VendorRegisterDto } from './dto/vendor-register.dto';
+import { DriverRegisterDto } from './dto/driver-register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from './types';
 
@@ -31,6 +33,16 @@ export class AuthController {
   @Post('admin/login')
   adminLogin(@Body() dto: AdminLoginDto) {
     return this.authService.adminLogin(dto);
+  }
+
+  @Post('vendor/register')
+  registerVendor(@Body() dto: VendorRegisterDto) {
+    return this.authService.registerVendor(dto);
+  }
+
+  @Post('driver/register')
+  registerDriver(@Body() dto: DriverRegisterDto) {
+    return this.authService.registerDriver(dto);
   }
 
   @Get('me')

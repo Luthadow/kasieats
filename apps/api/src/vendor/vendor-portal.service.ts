@@ -8,6 +8,11 @@ import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateVendorOrderStatusDto, VendorOrderAction } from './dto/update-vendor-order-status.dto';
+import {
+  CreateMenuItemDto,
+  ToggleMenuItemDto,
+  UpdateMenuItemDto,
+} from './dto/menu-item.dto';
 
 type VendorOrderWithDetails = Prisma.OrderGetPayload<{
   include: {
@@ -145,6 +150,125 @@ export class VendorPortalService {
     return {
       success: true,
       data: { isOpenNow: updated.is_open_now },
+    };
+  }
+
+  async listMenu(vendorUserId: string) {
+    const vendor = await this.getVendorForUser(vendorUserId);
+
+    const items = await this.prisma.menuItem.findMany({
+      where: { vendor_id: vendor.id },
+      orderBy: [{ display_order: 'asc' }, { name: 'asc' }],
+    });
+
+    return {
+      success: true,
+      data: items.map((item) => this.formatMenuItem(item)),
+    };
+  }
+
+  async createMenuItem(vendorUserId: string, dto: CreateMenuItemDto) {
+    const vendor = await this.getVendorForUser(vendorUserId);
+    const menu = await this.getOrCreateMenu(vendor.id);
+
+    const count = await this.prisma.menuItem.count({ where: { vendor_id: vendor.id } });
+
+    const item = await this.prisma.menuItem.create({
+      data: {
+        menu_id: menu.id,
+        vendor_id: vendor.id,
+        name: dto.name,
+        description: dto.description,
+        category: dto.category ?? 'Main',
+        price: dto.price,
+        image_url: dto.imageUrl,
+        preparation_time_minutes: dto.preparationTimeMinutes ?? 15,
+        display_order: count,
+      },
+    });
+
+    return { success: true, data: this.formatMenuItem(item) };
+  }
+
+  async updateMenuItem(vendorUserId: string, itemId: string, dto: UpdateMenuItemDto) {
+    const vendor = await this.getVendorForUser(vendorUserId);
+
+    const existing = await this.prisma.menuItem.findFirst({
+      where: { id: itemId, vendor_id: vendor.id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    const item = await this.prisma.menuItem.update({
+      where: { id: itemId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.category !== undefined ? { category: dto.category } : {}),
+        ...(dto.price !== undefined ? { price: dto.price } : {}),
+        ...(dto.imageUrl !== undefined ? { image_url: dto.imageUrl } : {}),
+        ...(dto.preparationTimeMinutes !== undefined
+          ? { preparation_time_minutes: dto.preparationTimeMinutes }
+          : {}),
+        ...(dto.isAvailable !== undefined ? { is_available: dto.isAvailable } : {}),
+      },
+    });
+
+    return { success: true, data: this.formatMenuItem(item) };
+  }
+
+  async toggleMenuItem(vendorUserId: string, itemId: string, dto: ToggleMenuItemDto) {
+    return this.updateMenuItem(vendorUserId, itemId, { isAvailable: dto.isAvailable });
+  }
+
+  async deleteMenuItem(vendorUserId: string, itemId: string) {
+    const vendor = await this.getVendorForUser(vendorUserId);
+
+    const existing = await this.prisma.menuItem.findFirst({
+      where: { id: itemId, vendor_id: vendor.id },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Menu item not found');
+    }
+
+    await this.prisma.menuItem.delete({ where: { id: itemId } });
+
+    return { success: true };
+  }
+
+  private async getOrCreateMenu(vendorId: string) {
+    const existing = await this.prisma.menu.findFirst({ where: { vendor_id: vendorId } });
+    if (existing) return existing;
+
+    return this.prisma.menu.create({
+      data: { vendor_id: vendorId, category: 'Main' },
+    });
+  }
+
+  private formatMenuItem(item: {
+    id: string;
+    name: string;
+    description: string | null;
+    category: string | null;
+    price: { toString(): string } | number;
+    is_available: boolean;
+    image_url: string | null;
+    preparation_time_minutes: number;
+    stock_quantity: number;
+  }) {
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      category: item.category,
+      price: Number(item.price),
+      isAvailable: item.is_available,
+      imageUrl: item.image_url,
+      preparationTimeMinutes: item.preparation_time_minutes,
+      stockQuantity: item.stock_quantity,
     };
   }
 

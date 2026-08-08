@@ -99,6 +99,9 @@ export default function LoginPage() {
         </form>
 
         <p className="hint">Dev login: 0831234567 · OTP 123456 (Mama Lindiwe&apos;s Kota Stand)</p>
+        <p className="hint">
+          New store? <a href="/register">Apply to join KasiEats</a>
+        </p>
       </div>
     </div>
   );

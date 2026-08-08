@@ -273,3 +273,80 @@ body {
     padding: 16px;
   }
 }
+
+.menu-form h2 {
+  margin: 0 0 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.menu-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.menu-form input,
+.menu-form textarea,
+.menu-form select,
+.register-card select {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.menu-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.menu-item-card {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-item-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.badge-offline {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 14px;
+  margin: 4px 0 0;
+}
+
+.inline-row {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-row input {
+  flex: 1;
+}
+
+.register-card select {
+  width: 100%;
+  margin-bottom: 12px;
+}

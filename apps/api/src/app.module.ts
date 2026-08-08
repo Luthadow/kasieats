@@ -10,6 +10,7 @@ import { DriverModule } from './driver/driver.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
+import { SmsModule } from './sms/sms.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AdminModule } from './admin/admin.module';
       envFilePath: ['.env.local', '.env'],
     }),
     PrismaModule,
+    SmsModule,
     AuthModule,
     VendorsModule,
     OrdersModule,

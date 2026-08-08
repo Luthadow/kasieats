@@ -36,6 +36,15 @@ Launch KasiEats in **Rustenburg townships** with 5 active food outlets, 1 active
 - [ ] Run 10 test orders end-to-end (customer → vendor → driver → delivered)
 - [ ] Enable Ozow/Yoco production keys when ready (`PAYMENTS_SANDBOX=false`)
 - [ ] Configure Firebase for push notifications (`FIREBASE_PROJECT_ID`)
+- [ ] Set SMS provider for production OTP (`SMS_PROVIDER=twilio` or `africas_talking`)
+
+## Vendor self-service
+
+Vendors can apply at http://localhost:3001/register — admin approves in the dashboard.
+
+## Menu management
+
+Approved vendors manage their menu at http://localhost:3001/menu
 
 ## Commission model
 

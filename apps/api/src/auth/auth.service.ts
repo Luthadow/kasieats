@@ -1,11 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { SmsService } from '../sms/sms.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
+import { VendorRegisterDto } from './dto/vendor-register.dto';
+import { DriverRegisterDto } from './dto/driver-register.dto';
 import { AdminLoginDto } from '../admin/dto/admin.dto';
 import type { JwtPayload } from '@kasieats/shared';
 
@@ -19,6 +22,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly smsService: SmsService,
   ) {}
 
   async sendOtp(dto: SendOtpDto) {
@@ -30,7 +34,8 @@ export class AuthService {
       expiresAt: Date.now() + 60_000,
     });
 
-    // TODO: Integrate SMS provider (Twilio / Africa's Talking)
+    await this.smsService.sendOtp(phone, code);
+
     return {
       success: true,
       message: 'OTP sent',
@@ -181,6 +186,120 @@ export class AuthService {
     };
   }
 
+  async registerVendor(dto: VendorRegisterDto) {
+    const phone = this.normalizePhone(dto.phone);
+    this.consumeOtp(phone, dto.otp);
+
+    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    if (existing?.user_type === 'vendor') {
+      throw new ConflictException('This phone is already registered as a vendor');
+    }
+    if (existing && existing.user_type !== 'customer') {
+      throw new ConflictException('Phone number already in use');
+    }
+
+    const user =
+      existing ??
+      (await this.prisma.user.create({
+        data: {
+          phone,
+          user_type: 'vendor',
+          phone_verified: true,
+          phone_verified_at: new Date(),
+        },
+      }));
+
+    if (existing) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { user_type: 'vendor', phone_verified: true, phone_verified_at: new Date() },
+      });
+    }
+
+    const vendor = await this.prisma.vendor.create({
+      data: {
+        user_id: user.id,
+        store_name: dto.storeName,
+        store_description: dto.storeDescription,
+        store_category: dto.storeCategory,
+        phone,
+        address: dto.address,
+        city: dto.city ?? 'Rustenburg',
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        status: 'pending_approval',
+      },
+    });
+
+    await this.prisma.menu.create({
+      data: {
+        vendor_id: vendor.id,
+        category: 'Main',
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Vendor application submitted. An admin will review your store shortly.',
+      data: {
+        vendorId: vendor.id,
+        storeName: vendor.store_name,
+        status: vendor.status,
+      },
+    };
+  }
+
+  async registerDriver(dto: DriverRegisterDto) {
+    const phone = this.normalizePhone(dto.phone);
+    this.consumeOtp(phone, dto.otp);
+
+    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    if (existing?.user_type === 'driver') {
+      throw new ConflictException('This phone is already registered as a driver');
+    }
+    if (existing && existing.user_type !== 'customer') {
+      throw new ConflictException('Phone number already in use');
+    }
+
+    const user =
+      existing ??
+      (await this.prisma.user.create({
+        data: {
+          phone,
+          user_type: 'driver',
+          phone_verified: true,
+          phone_verified_at: new Date(),
+        },
+      }));
+
+    if (existing) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { user_type: 'driver', phone_verified: true, phone_verified_at: new Date() },
+      });
+    }
+
+    const driver = await this.prisma.driver.create({
+      data: {
+        user_id: user.id,
+        first_name: dto.firstName,
+        last_name: dto.lastName,
+        vehicle_type: dto.vehicleType,
+        vehicle_plate: dto.vehiclePlate,
+        status: 'pending_approval',
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Driver application submitted. An admin will review your profile shortly.',
+      data: {
+        driverId: driver.id,
+        status: driver.status,
+      },
+    };
+  }
+
   async adminLogin(dto: AdminLoginDto) {
     const user = await this.prisma.user.findFirst({
       where: { email: dto.email, user_type: 'admin' },
@@ -247,5 +366,16 @@ export class AuthService {
 
   private generateOtp(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private consumeOtp(phone: string, otp: string) {
+    const stored = this.otpStore.get(phone);
+    if (!stored || stored.expiresAt < Date.now()) {
+      throw new UnauthorizedException('OTP expired. Request a new code.');
+    }
+    if (stored.code !== otp) {
+      throw new UnauthorizedException('Invalid OTP');
+    }
+    this.otpStore.delete(phone);
   }
 }

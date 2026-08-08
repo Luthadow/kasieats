@@ -3,7 +3,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { useNotifications } from './hooks/useNotifications';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
+import MenuPage from './pages/MenuPage';
 import OrdersPage from './pages/OrdersPage';
+import RegisterPage from './pages/RegisterPage';
 
 function ProtectedLayout() {
   const { token, user, clearAuth } = useAuth();
@@ -25,6 +27,7 @@ function ProtectedLayout() {
         </div>
         <nav>
           <Link to="/">Dashboard</Link>
+          <Link to="/menu">Menu</Link>
           <Link to="/orders">
             Orders{unreadCount > 0 ? ` (${unreadCount})` : ''}
           </Link>
@@ -36,6 +39,7 @@ function ProtectedLayout() {
       <main className="content">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/menu" element={<MenuPage />} />
           <Route path="/orders" element={<OrdersPage />} />
         </Routes>
       </main>
@@ -49,6 +53,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/register" element={token ? <Navigate to="/" replace /> : <RegisterPage />} />
       <Route path="/*" element={<ProtectedLayout />} />
     </Routes>
   );

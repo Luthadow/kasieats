@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/types';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateReviewDto } from './dto/create-review.dto';
 
 @ApiTags('orders')
 @Controller('orders')
@@ -25,6 +26,20 @@ export class OrdersController {
   @Get(':id/tracking')
   getTracking(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.ordersService.getOrderTracking(req.user.sub, id);
+  }
+
+  @Get(':id/reviews')
+  getReviews(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.ordersService.getOrderReviews(req.user.sub, id);
+  }
+
+  @Post(':id/reviews')
+  submitReview(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.ordersService.submitReview(req.user.sub, id, dto);
   }
 
   @Get(':id')
