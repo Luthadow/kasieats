@@ -62,4 +62,23 @@ export class AdminPortalController {
   ) {
     return this.adminPortalService.rejectDriver(id, req.user.sub, dto);
   }
+
+  @Get('withdrawals/pending')
+  listPendingWithdrawals() {
+    return this.adminPortalService.listPendingWithdrawals();
+  }
+
+  @Patch('withdrawals/:id/approve')
+  approveWithdrawal(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.adminPortalService.approveWithdrawal(id, req.user.sub);
+  }
+
+  @Patch('withdrawals/:id/reject')
+  rejectWithdrawal(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: RejectApplicationDto,
+  ) {
+    return this.adminPortalService.rejectWithdrawal(id, req.user.sub, dto);
+  }
 }

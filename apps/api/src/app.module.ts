@@ -11,6 +11,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdminModule } from './admin/admin.module';
 import { SmsModule } from './sms/sms.module';
+import { WalletModule } from './wallet/wallet.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -20,6 +22,7 @@ import { SmsModule } from './sms/sms.module';
     }),
     PrismaModule,
     SmsModule,
+    WalletModule,
     AuthModule,
     VendorsModule,
     OrdersModule,
@@ -29,6 +32,7 @@ import { SmsModule } from './sms/sms.module';
     NotificationsModule,
     PaymentsModule,
     AdminModule,
+    CustomersModule,
   ],
 })
 export class AppModule {}

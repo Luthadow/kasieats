@@ -350,3 +350,36 @@ body {
   width: 100%;
   margin-bottom: 12px;
 }
+
+.withdraw-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.withdraw-form input {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  font-weight: 400;
+}
+
+.stat-card.highlight {
+  border: 1px solid #fdba74;
+  background: #fff7ed;
+}
+
+.credit {
+  color: #16a34a;
+}
+
+.debit {
+  color: #dc2626;
+}
+
+.success-text {
+  color: #16a34a;
+  margin-top: 12px;
+}

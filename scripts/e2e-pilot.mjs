@@ -96,6 +96,12 @@ async function main() {
   assert(Array.isArray(notifications.data), 'Notifications failed');
   console.log(`✓ Notifications (${notifications.unreadCount} unread for vendor)`);
 
+  const addresses = await request('/customers/addresses', {
+    headers: { Authorization: `Bearer ${customerAuth.token}` },
+  });
+  assert(Array.isArray(addresses.data), 'Customer addresses failed');
+  console.log(`✓ Customer addresses (${addresses.data.length} saved)`);
+
   console.log('\nAll pilot smoke checks passed.');
 }
 

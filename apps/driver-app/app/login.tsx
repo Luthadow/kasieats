@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { apiRequest } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 
@@ -88,6 +88,11 @@ export default function LoginScreen() {
       </Pressable>
 
       <Text style={styles.hint}>Dev login: 0851234567 · OTP 123456 (Thabiso)</Text>
+      <Link href="/register" asChild>
+        <Pressable>
+          <Text style={styles.link}>New driver? Apply here</Text>
+        </Pressable>
+      </Link>
     </View>
   );
 }
@@ -115,4 +120,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   hint: { marginTop: 16, color: '#64748b', textAlign: 'center' },
+  link: { marginTop: 12, color: '#c2410c', textAlign: 'center', fontWeight: '700' },
 });

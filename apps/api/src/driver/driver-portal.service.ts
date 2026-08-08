@@ -8,6 +8,7 @@ import { DRIVER_EARNINGS_SHARE } from '@kasieats/shared';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WalletService } from '../wallet/wallet.service';
 import {
   DriverDeliveryAction,
   UpdateDriverDeliveryDto,
@@ -43,6 +44,7 @@ export class DriverPortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly walletService: WalletService,
   ) {}
 
   async getDashboard(driverUserId: string) {
@@ -318,6 +320,14 @@ export class DriverPortalService {
           },
         });
 
+        await tx.vendor.update({
+          where: { id: delivery.order.vendor_id },
+          data: {
+            total_orders: { increment: 1 },
+            total_revenue: { increment: Number(delivery.order.vendor_payout ?? 0) },
+          },
+        });
+
         if (delivery.order.payment_method === 'cash') {
           await tx.order.update({
             where: { id: delivery.order_id },
@@ -340,6 +350,28 @@ export class DriverPortalService {
     }
 
     if (dto.action === DriverDeliveryAction.COMPLETE) {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: updated.order.vendor_id },
+      });
+
+      if (vendor) {
+        await this.walletService.creditForOrderPayout({
+          userId: vendor.user_id,
+          amount: Number(updated.order.vendor_payout ?? 0),
+          orderId: updated.order_id,
+          description: `Payout for order #${updated.order_id.slice(-6)}`,
+          transactionType: 'vendor_payout',
+        });
+      }
+
+      await this.walletService.creditForOrderPayout({
+        userId: driver.user_id,
+        amount: Number(updated.driver_earned ?? 0),
+        orderId: updated.order_id,
+        description: `Delivery earnings for order #${updated.order_id.slice(-6)}`,
+        transactionType: 'driver_earning',
+      });
+
       await this.notifications.notify({
         userId: updated.order.customer.user_id,
         title: 'Delivered!',

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WalletService } from '../wallet/wallet.service';
 import { RejectApplicationDto } from './dto/admin.dto';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class AdminPortalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly walletService: WalletService,
   ) {}
 
   async getDashboard() {
@@ -227,5 +229,17 @@ export class AdminPortalService {
     });
 
     return { success: true, data: { id: updated.id, status: updated.status } };
+  }
+
+  listPendingWithdrawals() {
+    return this.walletService.listPendingWithdrawals();
+  }
+
+  approveWithdrawal(withdrawalId: string, adminUserId: string) {
+    return this.walletService.approveWithdrawal(withdrawalId, adminUserId);
+  }
+
+  rejectWithdrawal(withdrawalId: string, adminUserId: string, dto: RejectApplicationDto) {
+    return this.walletService.rejectWithdrawal(withdrawalId, adminUserId, dto.reason);
   }
 }

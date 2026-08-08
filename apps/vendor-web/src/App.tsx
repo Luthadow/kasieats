@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useNotifications } from './hooks/useNotifications';
 import DashboardPage from './pages/DashboardPage';
+import EarningsPage from './pages/EarningsPage';
 import LoginPage from './pages/LoginPage';
 import MenuPage from './pages/MenuPage';
 import OrdersPage from './pages/OrdersPage';
@@ -28,6 +29,7 @@ function ProtectedLayout() {
         <nav>
           <Link to="/">Dashboard</Link>
           <Link to="/menu">Menu</Link>
+          <Link to="/earnings">Earnings</Link>
           <Link to="/orders">
             Orders{unreadCount > 0 ? ` (${unreadCount})` : ''}
           </Link>
@@ -40,6 +42,7 @@ function ProtectedLayout() {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/menu" element={<MenuPage />} />
+          <Route path="/earnings" element={<EarningsPage />} />
           <Route path="/orders" element={<OrdersPage />} />
         </Routes>
       </main>

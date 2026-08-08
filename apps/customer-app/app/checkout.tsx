@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,15 +17,50 @@ import { apiRequest } from '../src/services/api';
 
 type PaymentMethod = 'cash' | 'card';
 
+interface SavedAddress {
+  id: string;
+  formatted: string;
+  latitude: number;
+  longitude: number;
+  isDefault: boolean;
+}
+
 export default function CheckoutScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
   const { vendorId, vendorName, items, subtotal, deliveryFee, serviceFee, total, clearCart } =
     useCart();
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState('123 Zuma Street, Rustenburg');
+  const [deliveryLatitude, setDeliveryLatitude] = useState(-25.6544);
+  const [deliveryLongitude, setDeliveryLongitude] = useState(27.2389);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    apiRequest<{ success: boolean; data: SavedAddress[] }>('/customers/addresses', {}, token)
+      .then((response) => {
+        setAddresses(response.data);
+        const defaultAddress = response.data.find((a) => a.isDefault) ?? response.data[0];
+        if (defaultAddress) {
+          setSelectedAddressId(defaultAddress.id);
+          setDeliveryAddress(defaultAddress.formatted);
+          setDeliveryLatitude(defaultAddress.latitude);
+          setDeliveryLongitude(defaultAddress.longitude);
+        }
+      })
+      .catch(() => null);
+  }, [token]);
+
+  const selectAddress = (address: SavedAddress) => {
+    setSelectedAddressId(address.id);
+    setDeliveryAddress(address.formatted);
+    setDeliveryLatitude(address.latitude);
+    setDeliveryLongitude(address.longitude);
+  };
 
   if (!token || !user) {
     return (
@@ -63,8 +98,8 @@ export default function CheckoutScreen() {
               quantity: item.quantity,
             })),
             deliveryAddress,
-            deliveryLatitude: -25.6544,
-            deliveryLongitude: 27.2389,
+            deliveryLatitude,
+            deliveryLongitude,
             specialInstructions: specialInstructions || undefined,
             paymentMethod,
           }),
@@ -134,12 +169,38 @@ export default function CheckoutScreen() {
       </View>
 
       <Text style={styles.label}>Delivery address</Text>
+      {addresses.length > 0 && (
+        <View style={styles.addressList}>
+          {addresses.map((address) => (
+            <Pressable
+              key={address.id}
+              style={[
+                styles.addressOption,
+                selectedAddressId === address.id && styles.addressOptionActive,
+              ]}
+              onPress={() => selectAddress(address)}
+            >
+              <Text
+                style={[
+                  styles.addressOptionText,
+                  selectedAddressId === address.id && styles.addressOptionTextActive,
+                ]}
+              >
+                {address.formatted}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
       <TextInput
         style={styles.input}
         value={deliveryAddress}
         onChangeText={setDeliveryAddress}
         placeholder="Street address"
       />
+      <Pressable onPress={() => router.push('/addresses')}>
+        <Text style={styles.manageAddresses}>Manage saved addresses</Text>
+      </Pressable>
 
       <Text style={styles.label}>Special instructions</Text>
       <TextInput
@@ -224,6 +285,18 @@ const styles = StyleSheet.create({
   },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between' },
   label: { fontWeight: '700', marginBottom: 8 },
+  addressList: { gap: 8, marginBottom: 12 },
+  addressOption: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 12,
+  },
+  addressOptionActive: { borderColor: '#f97316', backgroundColor: '#fff7ed' },
+  addressOptionText: { fontWeight: '600' },
+  addressOptionTextActive: { color: '#c2410c' },
+  manageAddresses: { color: '#6366f1', fontWeight: '700', marginBottom: 16 },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,

@@ -46,6 +46,17 @@ Vendors can apply at http://localhost:3001/register — admin approves in the da
 
 Approved vendors manage their menu at http://localhost:3001/menu
 
+## Wallets & payouts
+
+- Vendor/driver wallets credit automatically when orders are delivered
+- Request withdrawal via vendor web **Earnings** or driver app **Wallet**
+- Admin approves payouts at http://localhost:3002/withdrawals
+
+## Customer addresses
+
+- Manage at `/addresses` in the customer app
+- Saved addresses appear at checkout
+
 ## Commission model
 
 - Platform fee: 15% of subtotal (via service fee)

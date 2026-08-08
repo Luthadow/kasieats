@@ -181,6 +181,10 @@ export default function DriverHomeScreen() {
       <Pressable style={styles.secondaryButton} onPress={clearAuth}>
         <Text style={styles.secondaryButtonText}>Sign out</Text>
       </Pressable>
+
+      <Pressable style={styles.earningsButton} onPress={() => router.push('/earnings')}>
+        <Text style={styles.earningsButtonText}>View wallet & payouts</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -255,4 +259,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   secondaryButtonText: { fontWeight: '700' },
+  earningsButton: {
+    backgroundColor: '#eef2ff',
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  earningsButtonText: { fontWeight: '700', color: '#4338ca' },
 });
