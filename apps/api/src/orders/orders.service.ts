@@ -169,6 +169,52 @@ export class OrdersService {
     return { success: true, data: this.formatOrder(order) };
   }
 
+  async getOrderTracking(customerUserId: string, orderId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { user_id: customerUserId },
+    });
+
+    if (!customer) {
+      throw new ForbiddenException();
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customer_id: customer.id },
+      include: {
+        delivery: {
+          include: {
+            driver: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const driver = order.delivery?.driver;
+
+    return {
+      success: true,
+      data: {
+        orderId: order.id,
+        orderStatus: order.status,
+        deliveryStatus: order.delivery?.status ?? null,
+        driver: driver
+          ? {
+              name: `${driver.first_name} ${driver.last_name}`,
+              rating: Number(driver.average_rating),
+              vehicleType: driver.vehicle_type,
+              latitude: driver.current_latitude ? Number(driver.current_latitude) : null,
+              longitude: driver.current_longitude ? Number(driver.current_longitude) : null,
+              locationUpdatedAt: driver.location_updated_at,
+            }
+          : null,
+      },
+    };
+  }
+
   private formatOrder(order: OrderWithDetails | Omit<OrderWithDetails, 'delivery'> & { delivery?: OrderWithDetails['delivery'] | null }) {
     return {
       id: order.id,
@@ -195,11 +241,19 @@ export class OrdersService {
       })),
       delivery: order.delivery
         ? {
+            id: order.delivery.id,
             status: order.delivery.status,
             driver: order.delivery.driver
               ? {
                   name: `${order.delivery.driver.first_name} ${order.delivery.driver.last_name}`,
                   rating: Number(order.delivery.driver.average_rating),
+                  vehicleType: order.delivery.driver.vehicle_type,
+                  latitude: order.delivery.driver.current_latitude
+                    ? Number(order.delivery.driver.current_latitude)
+                    : null,
+                  longitude: order.delivery.driver.current_longitude
+                    ? Number(order.delivery.driver.current_longitude)
+                    : null,
                 }
               : null,
           }

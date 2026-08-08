@@ -30,6 +30,15 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   rejected: 'Rejected',
 };
 
+export const DELIVERY_STATUS_LABELS: Record<string, string> = {
+  assigned: 'Assigned',
+  picked_up: 'Collected',
+  en_route: 'On the Way',
+  arrived: 'Arrived',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+};
+
 export const SOUTH_AFRICA_COUNTRY_CODE = '27';
 
 export const DEFAULT_CITY = 'Rustenburg';

@@ -208,6 +208,7 @@ async function main() {
   console.log(`Admin user: ${adminUser.phone}`);
   console.log(`Customer: ${customerUser.phone}`);
   console.log(`Vendor: ${vendor.store_name}`);
+  console.log(`Driver: ${driverUser.phone} (Thabiso)`);
 }
 
 main()

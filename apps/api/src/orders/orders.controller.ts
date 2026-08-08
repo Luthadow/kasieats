@@ -22,6 +22,11 @@ export class OrdersController {
     return this.ordersService.listCustomerOrders(req.user.sub);
   }
 
+  @Get(':id/tracking')
+  getTracking(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.ordersService.getOrderTracking(req.user.sub, id);
+  }
+
   @Get(':id')
   getOne(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.ordersService.getOrder(req.user.sub, id);

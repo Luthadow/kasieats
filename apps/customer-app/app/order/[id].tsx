@@ -13,6 +13,26 @@ interface OrderDetail {
   estimatedDeliveryMinutes: number | null;
   vendor: { storeName: string };
   items: Array<{ name: string; quantity: number }>;
+  delivery: {
+    status: string;
+    driver: {
+      name: string;
+      rating: number;
+      vehicleType: string;
+      latitude: number | null;
+      longitude: number | null;
+    } | null;
+  } | null;
+}
+
+interface TrackingData {
+  driver: {
+    name: string;
+    rating: number;
+    vehicleType: string;
+    latitude: number | null;
+    longitude: number | null;
+  } | null;
 }
 
 export default function OrderDetailScreen() {
@@ -20,19 +40,24 @@ export default function OrderDetailScreen() {
   const router = useRouter();
   const { token } = useAuth();
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [tracking, setTracking] = useState<TrackingData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id || !token) return;
 
-    const fetchOrder = () => {
-      apiRequest<{ success: boolean; data: OrderDetail }>(`/orders/${id}`, {}, token)
-        .then((response) => setOrder(response.data))
-        .finally(() => setLoading(false));
+    const fetchAll = async () => {
+      const [orderResponse, trackingResponse] = await Promise.all([
+        apiRequest<{ success: boolean; data: OrderDetail }>(`/orders/${id}`, {}, token),
+        apiRequest<{ success: boolean; data: TrackingData }>(`/orders/${id}/tracking`, {}, token),
+      ]);
+      setOrder(orderResponse.data);
+      setTracking(trackingResponse.data);
+      setLoading(false);
     };
 
-    fetchOrder();
-    const interval = setInterval(fetchOrder, 10000);
+    fetchAll();
+    const interval = setInterval(fetchAll, 8000);
     return () => clearInterval(interval);
   }, [id, token]);
 
@@ -52,6 +77,8 @@ export default function OrderDetailScreen() {
     );
   }
 
+  const driver = tracking?.driver ?? order.delivery?.driver;
+
   return (
     <View style={styles.container}>
       <View style={styles.statusCard}>
@@ -61,6 +88,23 @@ export default function OrderDetailScreen() {
           {order.vendor.storeName} · ETA {order.estimatedDeliveryMinutes ?? 35} min
         </Text>
       </View>
+
+      {driver && (
+        <View style={styles.driverCard}>
+          <Text style={styles.panelTitle}>Your driver</Text>
+          <Text style={styles.driverName}>{driver.name}</Text>
+          <Text style={styles.driverMeta}>
+            ★ {driver.rating} · {driver.vehicleType}
+          </Text>
+          {driver.latitude && driver.longitude ? (
+            <Text style={styles.location}>
+              Live location: {driver.latitude.toFixed(4)}, {driver.longitude.toFixed(4)}
+            </Text>
+          ) : (
+            <Text style={styles.location}>Driver location updating...</Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Items</Text>
@@ -74,7 +118,7 @@ export default function OrderDetailScreen() {
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Delivery</Text>
         <Text>{order.deliveryAddress}</Text>
-        <Text style={styles.total}>Total paid: R{order.totalAmount.toFixed(2)}</Text>
+        <Text style={styles.total}>Total: R{order.totalAmount.toFixed(2)}</Text>
       </View>
 
       <Pressable style={styles.secondaryButton} onPress={() => router.push('/orders')}>
@@ -95,6 +139,13 @@ const styles = StyleSheet.create({
   statusLabel: { color: '#94a3b8', marginBottom: 4 },
   statusValue: { color: '#fff', fontSize: 28, fontWeight: '800' },
   meta: { color: '#cbd5e1', marginTop: 8 },
+  driverCard: {
+    backgroundColor: '#fff7ed',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+  },
   panel: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -102,6 +153,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   panelTitle: { fontWeight: '800', marginBottom: 4 },
+  driverName: { fontSize: 18, fontWeight: '800' },
+  driverMeta: { color: '#c2410c', fontWeight: '600' },
+  location: { color: '#64748b', marginTop: 6, fontSize: 13 },
   itemLine: { color: '#334155' },
   total: { fontWeight: '800', marginTop: 8 },
   secondaryButton: {

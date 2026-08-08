@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "KasiEats Driver",
+    "slug": "kasieats-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "kasieats-driver",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "co.za.kasieats.driver"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "co.za.kasieats.driver"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
