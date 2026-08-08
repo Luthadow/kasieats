@@ -9,8 +9,11 @@ const BASE = process.argv[2] ?? 'http://localhost:3000/api/v1';
 
 async function request(path, options = {}) {
   const response = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {}),
+    },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -58,6 +61,10 @@ async function main() {
   assert(dashboard.data?.pilotCity === 'Rustenburg', 'Admin dashboard missing pilot data');
   console.log(`✓ Admin dashboard (${dashboard.data.pendingVendors} pending vendors)`);
 
+  await request('/auth/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ phone: '0831234567' }),
+  });
   const vendorAuth = await request('/auth/verify-otp', {
     method: 'POST',
     body: JSON.stringify({ phone: '0831234567', otp: '123456' }),
