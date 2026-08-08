@@ -34,6 +34,10 @@ export class OrderEventsGateway implements OnGatewayConnection {
       }
       this.server.to(`order:${event.orderId}`).emit('order:update', event);
     });
+
+    this.orderEvents.subscribeNotifications((event) => {
+      this.server.to(`user:${event.userId}`).emit('notification:new', event);
+    });
   }
 
   handleConnection(client: Socket) {

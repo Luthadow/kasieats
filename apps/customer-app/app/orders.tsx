@@ -10,6 +10,7 @@ import {
 import { Link, useRouter } from 'expo-router';
 import { ORDER_STATUS_LABELS } from '@kasieats/shared';
 import { useAuth } from '../src/context/AuthContext';
+import { useRealtime } from '../src/context/RealtimeContext';
 import { apiRequest } from '../src/services/api';
 
 interface OrderSummary {
@@ -30,6 +31,7 @@ interface NotificationItem {
 export default function OrdersScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
+  const { onOrderUpdate, onNotification, connected } = useRealtime();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,11 +59,18 @@ export default function OrdersScreen() {
     loadData()
       .finally(() => setLoading(false));
 
+    const unsubs = [
+      onOrderUpdate(() => loadData().catch(() => null)),
+      onNotification(() => loadData().catch(() => null)),
+    ];
     const interval = setInterval(() => {
       loadData().catch(() => null);
-    }, 12000);
-    return () => clearInterval(interval);
-  }, [token, loadData]);
+    }, 60000);
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      clearInterval(interval);
+    };
+  }, [token, loadData, onOrderUpdate, onNotification]);
 
   if (!token || !user) {
     return (
@@ -87,6 +96,12 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={[styles.liveBadge, connected && styles.liveBadgeOn]}>
+        <View style={[styles.liveDot, connected && styles.liveDotOn]} />
+        <Text style={[styles.liveText, connected && styles.liveTextOn]}>
+          {connected ? 'Live updates' : 'Reconnecting…'}
+        </Text>
+      </View>
       {notifications.length > 0 && (
         <View style={styles.alertsPanel}>
           <Text style={styles.alertsTitle}>Updates</Text>
@@ -124,6 +139,22 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#f1f5f9',
+    marginBottom: 12,
+  },
+  liveBadgeOn: { backgroundColor: '#ecfdf5' },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#94a3b8' },
+  liveDotOn: { backgroundColor: '#22c55e' },
+  liveText: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  liveTextOn: { color: '#15803d' },
   alertsPanel: {
     backgroundColor: '#eef2ff',
     borderRadius: 14,

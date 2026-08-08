@@ -83,7 +83,8 @@ export interface CreateOrderInput {
   deliveryLatitude?: number;
   deliveryLongitude?: number;
   specialInstructions?: string;
-  paymentMethod: 'card' | 'cash';
+  paymentMethod: 'card' | 'cash' | 'ozow';
+  promoCode?: string;
 }
 
 export interface ApiResponse<T> {

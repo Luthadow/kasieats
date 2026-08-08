@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ORDER_STATUS_LABELS } from '@kasieats/shared';
 import { useAuth } from '../../src/context/AuthContext';
+import { useRealtime } from '../../src/context/RealtimeContext';
 import { apiRequest } from '../../src/services/api';
 
 interface OrderDetail {
@@ -70,6 +71,7 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { token } = useAuth();
+  const { watchOrder, onOrderUpdate } = useRealtime();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [tracking, setTracking] = useState<TrackingData | null>(null);
   const [reviews, setReviews] = useState<ReviewSummary[]>([]);
@@ -88,24 +90,43 @@ export default function OrderDetailScreen() {
     setReviews(response.data);
   }, [id, token]);
 
+  const fetchAll = useCallback(async () => {
+    if (!id || !token) return;
+    const [orderResponse, trackingResponse] = await Promise.all([
+      apiRequest<{ success: boolean; data: OrderDetail }>(`/orders/${id}`, {}, token),
+      apiRequest<{ success: boolean; data: TrackingData }>(`/orders/${id}/tracking`, {}, token),
+    ]);
+    setOrder(orderResponse.data);
+    setTracking(trackingResponse.data);
+  }, [id, token]);
+
   useEffect(() => {
     if (!id || !token) return;
 
-    const fetchAll = async () => {
-      const [orderResponse, trackingResponse] = await Promise.all([
-        apiRequest<{ success: boolean; data: OrderDetail }>(`/orders/${id}`, {}, token),
-        apiRequest<{ success: boolean; data: TrackingData }>(`/orders/${id}/tracking`, {}, token),
-      ]);
-      setOrder(orderResponse.data);
-      setTracking(trackingResponse.data);
-      setLoading(false);
-    };
-
-    fetchAll();
+    watchOrder(id);
+    fetchAll()
+      .catch(() => null)
+      .finally(() => setLoading(false));
     loadReviews();
-    const interval = setInterval(fetchAll, 8000);
-    return () => clearInterval(interval);
-  }, [id, token, loadReviews]);
+
+    const unsub = onOrderUpdate((event) => {
+      if (event.orderId !== id) return;
+      fetchAll().catch(() => null);
+      if (event.status === 'delivered') {
+        loadReviews().catch(() => null);
+      }
+    });
+
+    const interval = setInterval(() => {
+      fetchAll().catch(() => null);
+    }, 60000);
+
+    return () => {
+      unsub();
+      clearInterval(interval);
+      watchOrder(null);
+    };
+  }, [id, token, fetchAll, loadReviews, watchOrder, onOrderUpdate]);
 
   const submitReview = async (revieweeType: 'vendor' | 'driver', rating: number) => {
     if (!token || !id) return;

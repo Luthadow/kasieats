@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 
 interface DashboardData {
   customers: number;
@@ -17,16 +18,38 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { token } = useAuth();
+  const { onOrderUpdate, onNotification } = useRealtime();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    const response = await apiRequest<{ success: boolean; data: DashboardData }>(
+      '/admin/dashboard',
+      {},
+      token,
+    );
+    setData(response.data);
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
 
-    apiRequest<{ success: boolean; data: DashboardData }>('/admin/dashboard', {}, token)
-      .then((response) => setData(response.data))
+    load()
+      .catch(() => null)
       .finally(() => setLoading(false));
-  }, [token]);
+
+    const unsubs = [
+      onOrderUpdate(() => load().catch(() => null)),
+      onNotification(() => load().catch(() => null)),
+    ];
+    const interval = setInterval(() => load().catch(() => null), 60000);
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      clearInterval(interval);
+    };
+  }, [token, load, onOrderUpdate, onNotification]);
 
   if (loading) {
     return <p>Loading dashboard...</p>;

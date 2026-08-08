@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { DELIVERY_STATUS_LABELS, ORDER_STATUS_LABELS } from '@kasieats/shared';
 import { useAuth } from '../../src/context/AuthContext';
+import { useRealtime } from '../../src/context/RealtimeContext';
 import { apiRequest } from '../../src/services/api';
 
 interface DeliveryDetail {
@@ -12,6 +13,7 @@ interface DeliveryDetail {
   pickupAddress: string;
   deliveryAddress: string;
   order: {
+    id: string;
     status: string;
     specialInstructions: string | null;
     vendor: { storeName: string; phone: string };
@@ -26,11 +28,12 @@ export default function DeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { token } = useAuth();
+  const { watchOrder, onOrderUpdate } = useRealtime();
   const [delivery, setDelivery] = useState<DeliveryDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
 
-  const loadDelivery = async () => {
+  const loadDelivery = useCallback(async () => {
     if (!token) return;
     const response = await apiRequest<{ success: boolean; data: DeliveryDetail | null }>(
       '/driver/deliveries/active',
@@ -42,16 +45,29 @@ export default function DeliveryScreen() {
     } else if (response.data) {
       setDelivery(response.data);
     }
-  };
+  }, [token, id]);
 
   useEffect(() => {
     if (!token || !id) return;
     loadDelivery()
       .catch(() => null)
       .finally(() => setLoading(false));
-    const interval = setInterval(loadDelivery, 5000);
-    return () => clearInterval(interval);
-  }, [token, id]);
+
+    const unsub = onOrderUpdate(() => {
+      loadDelivery().catch(() => null);
+    });
+    const interval = setInterval(() => loadDelivery().catch(() => null), 60000);
+
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, [token, id, loadDelivery, onOrderUpdate]);
+
+  useEffect(() => {
+    watchOrder(delivery?.order.id ?? null);
+    return () => watchOrder(null);
+  }, [delivery?.order.id, watchOrder]);
 
   const performAction = async (action: DeliveryAction) => {
     if (!token || !delivery) return;

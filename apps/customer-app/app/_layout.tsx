@@ -1,12 +1,14 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../src/context/AuthContext';
+import { RealtimeProvider } from '../src/context/RealtimeContext';
 import { CartProvider } from '../src/context/CartContext';
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <CartProvider>
+      <RealtimeProvider>
+        <CartProvider>
         <StatusBar style="light" />
         <Stack
           screenOptions={{
@@ -25,7 +27,8 @@ export default function RootLayout() {
           <Stack.Screen name="addresses" options={{ title: 'Saved Addresses' }} />
           <Stack.Screen name="support" options={{ title: 'Help & Support' }} />
         </Stack>
-      </CartProvider>
+        </CartProvider>
+      </RealtimeProvider>
     </AuthProvider>
   );
 }

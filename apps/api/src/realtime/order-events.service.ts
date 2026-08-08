@@ -1,23 +1,22 @@
 import { Injectable } from '@nestjs/common';
-
-export interface OrderUpdateEvent {
-  orderId: string;
-  status: string;
-  vendorUserId?: string;
-  customerUserId?: string;
-  driverUserId?: string;
-  timestamp: string;
-}
+import { OrderUpdateEvent, NotificationEvent } from '@kasieats/shared';
 
 type OrderListener = (event: OrderUpdateEvent) => void;
+type NotificationListener = (event: NotificationEvent) => void;
 
 @Injectable()
 export class OrderEventsService {
-  private listeners = new Set<OrderListener>();
+  private orderListeners = new Set<OrderListener>();
+  private notificationListeners = new Set<NotificationListener>();
 
   subscribe(listener: OrderListener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.orderListeners.add(listener);
+    return () => this.orderListeners.delete(listener);
+  }
+
+  subscribeNotifications(listener: NotificationListener) {
+    this.notificationListeners.add(listener);
+    return () => this.notificationListeners.delete(listener);
   }
 
   emitOrderUpdate(
@@ -36,7 +35,13 @@ export class OrderEventsService {
       timestamp: new Date().toISOString(),
     };
 
-    for (const listener of this.listeners) {
+    for (const listener of this.orderListeners) {
+      listener(event);
+    }
+  }
+
+  emitNotification(event: NotificationEvent) {
+    for (const listener of this.notificationListeners) {
       listener(event);
     }
   }

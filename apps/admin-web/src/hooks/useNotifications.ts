@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../services/api';
+import { useRealtime } from '../context/RealtimeContext';
 
 interface NotificationItem {
   id: string;
@@ -11,6 +12,7 @@ interface NotificationItem {
 }
 
 export function useNotifications(token: string | null) {
+  const { onNotification } = useRealtime();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
@@ -25,20 +27,29 @@ export function useNotifications(token: string | null) {
     setUnreadCount(response.unreadCount);
   }, [token]);
 
-  useEffect(() => {
-    refresh().catch(() => null);
-    if (!token) return;
-    const interval = setInterval(() => {
-      refresh().catch(() => null);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [token, refresh]);
-
   const markAllRead = async () => {
     if (!token) return;
     await apiRequest('/notifications/read-all', { method: 'PATCH' }, token);
     await refresh();
   };
+
+  useEffect(() => {
+    refresh().catch(() => null);
+    if (!token) return;
+
+    const unsubscribe = onNotification(() => {
+      refresh().catch(() => null);
+    });
+
+    const interval = setInterval(() => {
+      refresh().catch(() => null);
+    }, 60000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [token, refresh, onNotification]);
 
   return { unreadCount, notifications, refresh, markAllRead };
 }

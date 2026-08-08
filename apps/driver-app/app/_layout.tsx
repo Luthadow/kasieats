@@ -1,12 +1,14 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../src/context/AuthContext';
+import { RealtimeProvider } from '../src/context/RealtimeContext';
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
-      <Stack
+      <RealtimeProvider>
+        <StatusBar style="light" />
+        <Stack
         screenOptions={{
           headerStyle: { backgroundColor: '#0f172a' },
           headerTintColor: '#fff',
@@ -19,7 +21,8 @@ export default function RootLayout() {
         <Stack.Screen name="earnings" options={{ title: 'Earnings' }} />
         <Stack.Screen name="jobs" options={{ title: 'Available Jobs' }} />
         <Stack.Screen name="delivery/[id]" options={{ title: 'Active Delivery' }} />
-      </Stack>
+        </Stack>
+      </RealtimeProvider>
     </AuthProvider>
   );
 }

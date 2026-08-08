@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
+import { useRealtime } from '../src/context/RealtimeContext';
 import { apiRequest } from '../src/services/api';
 
 interface DeliveryJob {
@@ -24,23 +25,39 @@ interface DeliveryJob {
 export default function JobsScreen() {
   const router = useRouter();
   const { token } = useAuth();
+  const { onOrderUpdate, onNotification } = useRealtime();
   const [jobs, setJobs] = useState<DeliveryJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
 
+  const loadJobs = useCallback(async () => {
+    if (!token) return;
+    const response = await apiRequest<{ success: boolean; data: DeliveryJob[] }>(
+      '/driver/jobs',
+      {},
+      token,
+    );
+    setJobs(response.data);
+  }, [token]);
+
   useEffect(() => {
     if (!token) return;
 
-    const loadJobs = () => {
-      apiRequest<{ success: boolean; data: DeliveryJob[] }>('/driver/jobs', {}, token)
-        .then((response) => setJobs(response.data))
-        .finally(() => setLoading(false));
-    };
+    loadJobs()
+      .catch(() => null)
+      .finally(() => setLoading(false));
 
-    loadJobs();
-    const interval = setInterval(loadJobs, 5000);
-    return () => clearInterval(interval);
-  }, [token]);
+    const unsubs = [
+      onOrderUpdate(() => loadJobs().catch(() => null)),
+      onNotification(() => loadJobs().catch(() => null)),
+    ];
+    const interval = setInterval(() => loadJobs().catch(() => null), 60000);
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      clearInterval(interval);
+    };
+  }, [token, loadJobs, onOrderUpdate, onNotification]);
 
   const acceptJob = async (orderId: string) => {
     if (!token) return;

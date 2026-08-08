@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ORDER_STATUS_LABELS } from '@kasieats/shared';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 
 interface VendorOrder {
   id: string;
@@ -25,6 +26,7 @@ interface VendorOrder {
 
 export default function OrdersPage() {
   const { token } = useAuth();
+  const { onOrderUpdate, onNotification } = useRealtime();
   const [orders, setOrders] = useState<VendorOrder[]>([]);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(true);
@@ -47,9 +49,16 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
-    const interval = setInterval(loadOrders, 8000);
-    return () => clearInterval(interval);
-  }, [loadOrders]);
+    const unsubs = [
+      onOrderUpdate(() => loadOrders()),
+      onNotification(() => loadOrders()),
+    ];
+    const interval = setInterval(loadOrders, 60000);
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      clearInterval(interval);
+    };
+  }, [loadOrders, onOrderUpdate, onNotification]);
 
   const updateOrder = async (
     orderId: string,

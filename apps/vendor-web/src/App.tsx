@@ -1,5 +1,6 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { RealtimeProvider, useRealtime } from './context/RealtimeContext';
 import { useNotifications } from './hooks/useNotifications';
 import DashboardPage from './pages/DashboardPage';
 import EarningsPage from './pages/EarningsPage';
@@ -7,6 +8,16 @@ import LoginPage from './pages/LoginPage';
 import MenuPage from './pages/MenuPage';
 import OrdersPage from './pages/OrdersPage';
 import RegisterPage from './pages/RegisterPage';
+
+function LiveBadge() {
+  const { connected } = useRealtime();
+  return (
+    <div className={`live-badge ${connected ? 'live-badge--on' : ''}`}>
+      <span className="live-dot" />
+      {connected ? 'Live updates' : 'Reconnecting…'}
+    </div>
+  );
+}
 
 function ProtectedLayout() {
   const { token, user, clearAuth } = useAuth();
@@ -26,6 +37,7 @@ function ProtectedLayout() {
             <p>{user.storeName}</p>
           </div>
         </div>
+        <LiveBadge />
         <nav>
           <Link to="/">Dashboard</Link>
           <Link to="/menu">Menu</Link>
@@ -65,7 +77,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <RealtimeProvider>
+        <AppRoutes />
+      </RealtimeProvider>
     </AuthProvider>
   );
 }

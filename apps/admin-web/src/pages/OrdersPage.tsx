@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ORDER_STATUS_LABELS } from '@kasieats/shared';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 
 interface AdminOrder {
   id: string;
@@ -14,16 +15,38 @@ interface AdminOrder {
 
 export default function OrdersPage() {
   const { token } = useAuth();
+  const { onOrderUpdate, onNotification } = useRealtime();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    const response = await apiRequest<{ success: boolean; data: AdminOrder[] }>(
+      '/admin/orders',
+      {},
+      token,
+    );
+    setOrders(response.data);
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
 
-    apiRequest<{ success: boolean; data: AdminOrder[] }>('/admin/orders', {}, token)
-      .then((response) => setOrders(response.data))
+    load()
+      .catch(() => null)
       .finally(() => setLoading(false));
-  }, [token]);
+
+    const unsubs = [
+      onOrderUpdate(() => load().catch(() => null)),
+      onNotification(() => load().catch(() => null)),
+    ];
+    const interval = setInterval(() => load().catch(() => null), 60000);
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      clearInterval(interval);
+    };
+  }, [token, load, onOrderUpdate, onNotification]);
 
   return (
     <section>

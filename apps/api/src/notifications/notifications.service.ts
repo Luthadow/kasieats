@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrderEventsService } from '../realtime/order-events.service';
 
 interface NotifyInput {
   userId: string;
@@ -15,7 +16,10 @@ interface NotifyInput {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orderEvents: OrderEventsService,
+  ) {}
 
   async notify(input: NotifyInput) {
     const notification = await this.prisma.notification.create({
@@ -36,6 +40,13 @@ export class NotificationsService {
     if (process.env.FIREBASE_PROJECT_ID) {
       this.logger.log(`Push queued for user ${input.userId}: ${input.title}`);
     }
+
+    this.orderEvents.emitNotification({
+      userId: input.userId,
+      title: input.title,
+      message: input.message,
+      type: input.notificationType,
+    });
 
     return notification;
   }

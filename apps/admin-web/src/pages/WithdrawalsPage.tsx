@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 
 interface PendingWithdrawal {
   id: string;
@@ -13,6 +14,7 @@ interface PendingWithdrawal {
 
 export default function WithdrawalsPage() {
   const { token } = useAuth();
+  const { onNotification } = useRealtime();
   const [withdrawals, setWithdrawals] = useState<PendingWithdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -34,7 +36,15 @@ export default function WithdrawalsPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+
+    const unsub = onNotification(() => load().catch(() => null));
+    const interval = setInterval(() => load().catch(() => null), 60000);
+
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, [load, onNotification]);
 
   const approve = async (id: string) => {
     if (!token) return;

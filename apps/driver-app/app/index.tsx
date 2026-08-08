@@ -12,6 +12,7 @@ import {
 import { Link, useRouter } from 'expo-router';
 import { DELIVERY_STATUS_LABELS } from '@kasieats/shared';
 import { useAuth } from '../src/context/AuthContext';
+import { useRealtime } from '../src/context/RealtimeContext';
 import { apiRequest } from '../src/services/api';
 
 interface DashboardData {
@@ -32,6 +33,7 @@ interface DashboardData {
 export default function DriverHomeScreen() {
   const router = useRouter();
   const { token, user, clearAuth } = useAuth();
+  const { connected, onOrderUpdate, onNotification } = useRealtime();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,9 +64,18 @@ export default function DriverHomeScreen() {
     loadDashboard()
       .catch(() => null)
       .finally(() => setLoading(false));
-    const interval = setInterval(loadDashboard, 8000);
-    return () => clearInterval(interval);
-  }, [token, loadDashboard]);
+
+    const unsubs = [
+      onOrderUpdate(() => loadDashboard().catch(() => null)),
+      onNotification(() => loadDashboard().catch(() => null)),
+    ];
+    const interval = setInterval(() => loadDashboard().catch(() => null), 60000);
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      clearInterval(interval);
+    };
+  }, [token, loadDashboard, onOrderUpdate, onNotification]);
 
   const toggleOnline = async (isOnline: boolean) => {
     if (!token) return;
@@ -117,6 +128,12 @@ export default function DriverHomeScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.hero}>
+        <View style={[styles.liveBadge, connected && styles.liveBadgeOn]}>
+          <View style={[styles.liveDot, connected && styles.liveDotOn]} />
+          <Text style={[styles.liveText, connected && styles.liveTextOn]}>
+            {connected ? 'Live updates' : 'Reconnecting…'}
+          </Text>
+        </View>
         <Text style={styles.heroTitle}>Sawubona, {dashboard.firstName}</Text>
         <Text style={styles.heroSubtitle}>★ {dashboard.averageRating.toFixed(1)} rating</Text>
         {unreadAlerts > 0 && (
@@ -200,6 +217,22 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
   },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 12,
+  },
+  liveBadgeOn: { backgroundColor: 'rgba(34,197,94,0.15)' },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#64748b' },
+  liveDotOn: { backgroundColor: '#22c55e' },
+  liveText: { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
+  liveTextOn: { color: '#86efac' },
   heroTitle: { color: '#fff', fontSize: 24, fontWeight: '800' },
   heroSubtitle: { color: '#cbd5e1', marginTop: 4, marginBottom: 16 },
   alertBadge: {

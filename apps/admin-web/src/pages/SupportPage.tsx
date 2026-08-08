@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 
 interface SupportTicket {
   id: string;
@@ -17,6 +18,7 @@ interface SupportTicket {
 
 export default function SupportPage() {
   const { token } = useAuth();
+  const { onNotification } = useRealtime();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [filter, setFilter] = useState('open');
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,15 @@ export default function SupportPage() {
 
   useEffect(() => {
     load();
-  }, [load]);
+
+    const unsub = onNotification(() => load().catch(() => null));
+    const interval = setInterval(() => load().catch(() => null), 60000);
+
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
+  }, [load, onNotification]);
 
   const resolve = async (id: string) => {
     if (!token) return;
