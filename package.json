@@ -15,7 +15,8 @@
     "db:migrate": "yarn workspace @kasieats/db db:migrate",
     "db:seed": "yarn workspace @kasieats/db db:seed",
     "db:generate": "yarn workspace @kasieats/db db:generate",
-    "test:e2e": "node scripts/e2e-pilot.mjs"
+    "test:e2e": "node scripts/e2e-pilot.mjs",
+    "test:e2e:loop": "node scripts/e2e-delivery-loop.mjs"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
