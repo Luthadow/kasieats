@@ -1,10 +1,12 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
+import { AdminLoginDto } from '../admin/dto/admin.dto';
 import type { JwtPayload } from '@kasieats/shared';
 
 const DEV_OTP = '123456';
@@ -113,6 +115,20 @@ export class AuthService {
       };
     }
 
+    if (user.user_type === 'admin') {
+      return {
+        success: true,
+        needsProfile: false,
+        token,
+        user: {
+          id: user.id,
+          phone: user.phone,
+          email: user.email,
+          userType: user.user_type,
+        },
+      };
+    }
+
     if (customer) {
       return {
         success: true,
@@ -161,6 +177,34 @@ export class AuthService {
         userType: user.user_type,
         firstName: customer.first_name,
         lastName: customer.last_name,
+      },
+    };
+  }
+
+  async adminLogin(dto: AdminLoginDto) {
+    const user = await this.prisma.user.findFirst({
+      where: { email: dto.email, user_type: 'admin' },
+    });
+
+    if (!user?.password_hash) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const valid = await bcrypt.compare(dto.password, user.password_hash);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const token = await this.signToken(user.id, user.phone, 'admin');
+
+    return {
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        userType: user.user_type,
       },
     };
   }

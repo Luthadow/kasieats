@@ -72,8 +72,45 @@ export default function CheckoutScreen() {
         token,
       );
 
+      const orderId = response.data.id;
+
+      if (paymentMethod === 'card') {
+        const payment = await apiRequest<{
+          success: boolean;
+          data: {
+            paymentId: string;
+            sandbox: boolean;
+            instructions?: string;
+            paymentUrl?: string | null;
+          };
+        }>(
+          '/payments/initiate',
+          {
+            method: 'POST',
+            body: JSON.stringify({ orderId, provider: 'yoco' }),
+          },
+          token,
+        );
+
+        if (payment.data.sandbox) {
+          await apiRequest(
+            '/payments/confirm',
+            {
+              method: 'POST',
+              body: JSON.stringify({ paymentId: payment.data.paymentId }),
+            },
+            token,
+          );
+        } else if (payment.data.paymentUrl) {
+          Alert.alert(
+            'Complete payment',
+            payment.data.instructions ?? 'Open the payment link to complete your card payment.',
+          );
+        }
+      }
+
       clearCart();
-      router.replace(`/order/${response.data.id}`);
+      router.replace(`/order/${orderId}`);
     } catch (error) {
       Alert.alert('Order failed', error instanceof Error ? error.message : 'Please try again');
     } finally {
@@ -164,7 +201,11 @@ export default function CheckoutScreen() {
         )}
       </Pressable>
 
-      <Text style={styles.hint}>Status after placing: {ORDER_STATUS_LABELS.pending}</Text>
+      <Text style={styles.hint}>
+        {paymentMethod === 'card'
+          ? 'Card payments use Yoco sandbox — charged instantly in dev.'
+          : `Status after placing: ${ORDER_STATUS_LABELS.pending}`}
+      </Text>
     </ScrollView>
   );
 }

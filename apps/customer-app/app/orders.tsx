@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,11 +20,33 @@ interface OrderSummary {
   vendor: { storeName: string };
 }
 
+interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+}
+
 export default function OrdersScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    if (!token) return;
+    const [ordersResponse, alertsResponse] = await Promise.all([
+      apiRequest<{ success: boolean; data: OrderSummary[] }>('/orders', {}, token),
+      apiRequest<{ success: boolean; data: NotificationItem[] }>(
+        '/notifications?unreadOnly=true',
+        {},
+        token,
+      ),
+    ]);
+    setOrders(ordersResponse.data);
+    setNotifications(alertsResponse.data.slice(0, 3));
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
@@ -32,10 +54,14 @@ export default function OrdersScreen() {
       return;
     }
 
-    apiRequest<{ success: boolean; data: OrderSummary[] }>('/orders', {}, token)
-      .then((response) => setOrders(response.data))
+    loadData()
       .finally(() => setLoading(false));
-  }, [token]);
+
+    const interval = setInterval(() => {
+      loadData().catch(() => null);
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [token, loadData]);
 
   if (!token || !user) {
     return (
@@ -61,6 +87,17 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
+      {notifications.length > 0 && (
+        <View style={styles.alertsPanel}>
+          <Text style={styles.alertsTitle}>Updates</Text>
+          {notifications.map((item) => (
+            <View key={item.id} style={styles.alertItem}>
+              <Text style={styles.alertHeading}>{item.title}</Text>
+              <Text style={styles.alertMessage}>{item.message}</Text>
+            </View>
+          ))}
+        </View>
+      )}
       <FlatList
         data={orders}
         keyExtractor={(item) => item.id}
@@ -87,6 +124,18 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
+  alertsPanel: {
+    backgroundColor: '#eef2ff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+  },
+  alertsTitle: { fontWeight: '800', color: '#4338ca', marginBottom: 8 },
+  alertItem: { marginBottom: 8 },
+  alertHeading: { fontWeight: '700' },
+  alertMessage: { color: '#64748b', marginTop: 2, fontSize: 13 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 8 },
   subtitle: { color: '#64748b', lineHeight: 22, marginBottom: 16 },

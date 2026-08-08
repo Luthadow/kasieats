@@ -7,6 +7,7 @@ import {
 import { DRIVER_EARNINGS_SHARE } from '@kasieats/shared';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   DriverDeliveryAction,
   UpdateDriverDeliveryDto,
@@ -39,7 +40,10 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 
 @Injectable()
 export class DriverPortalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async getDashboard(driverUserId: string) {
     const driver = await this.getDriverForUser(driverUserId);
@@ -233,6 +237,14 @@ export class DriverPortalService {
       return created;
     });
 
+    await this.notifications.notify({
+      userId: delivery.order.customer.user_id,
+      title: 'Driver assigned',
+      message: `${driver.first_name} is on the way to collect your order.`,
+      notificationType: 'driver_assigned',
+      relatedOrderId: orderId,
+    });
+
     return {
       success: true,
       data: this.formatDelivery(delivery),
@@ -316,6 +328,33 @@ export class DriverPortalService {
 
       return nextDelivery;
     });
+
+    if (dto.action === DriverDeliveryAction.START_DELIVERY) {
+      await this.notifications.notify({
+        userId: updated.order.customer.user_id,
+        title: 'On the way!',
+        message: `${driver.first_name} is delivering your order now.`,
+        notificationType: 'driver_en_route',
+        relatedOrderId: updated.order_id,
+      });
+    }
+
+    if (dto.action === DriverDeliveryAction.COMPLETE) {
+      await this.notifications.notify({
+        userId: updated.order.customer.user_id,
+        title: 'Delivered!',
+        message: 'Your order has been delivered. Rate your experience.',
+        notificationType: 'order_delivered',
+        relatedOrderId: updated.order_id,
+      });
+      await this.notifications.notifyVendorByVendorId(
+        updated.order.vendor_id,
+        'Order delivered',
+        `Order #${updated.order_id.slice(-6)} was delivered successfully.`,
+        'order_delivered',
+        updated.order_id,
+      );
+    }
 
     return {
       success: true,

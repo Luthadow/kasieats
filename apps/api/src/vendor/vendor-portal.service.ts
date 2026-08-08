@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateVendorOrderStatusDto, VendorOrderAction } from './dto/update-vendor-order-status.dto';
 
 type VendorOrderWithDetails = Prisma.OrderGetPayload<{
@@ -17,7 +18,10 @@ type VendorOrderWithDetails = Prisma.OrderGetPayload<{
 
 @Injectable()
 export class VendorPortalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async getDashboard(vendorUserId: string) {
     const vendor = await this.getVendorForUser(vendorUserId);
@@ -98,6 +102,31 @@ export class VendorPortalService {
         order_items: { include: { menu_item: true } },
       },
     });
+
+    if (dto.action === VendorOrderAction.MARK_READY) {
+      await this.notifications.notify({
+        userId: updated.customer.user_id,
+        title: 'Order ready for pickup',
+        message: 'Your order is ready. A driver will collect it soon.',
+        notificationType: 'order_ready',
+        relatedOrderId: orderId,
+      });
+      await this.notifications.notifyOnlineDrivers(
+        'New delivery job',
+        `Order ready at ${vendor.store_name}. Tap to accept.`,
+        orderId,
+      );
+    }
+
+    if (dto.action === VendorOrderAction.ACCEPT) {
+      await this.notifications.notify({
+        userId: updated.customer.user_id,
+        title: 'Order accepted',
+        message: `${vendor.store_name} is preparing your order.`,
+        notificationType: 'order_accepted',
+        relatedOrderId: orderId,
+      });
+    }
 
     return {
       success: true,

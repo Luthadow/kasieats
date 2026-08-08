@@ -35,6 +35,7 @@ export default function DriverHomeScreen() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
 
   const loadDashboard = useCallback(async () => {
     if (!token) return;
@@ -44,6 +45,13 @@ export default function DriverHomeScreen() {
       token,
     );
     setDashboard(response.data);
+
+    const alerts = await apiRequest<{ unreadCount: number }>(
+      '/notifications?unreadOnly=true',
+      {},
+      token,
+    );
+    setUnreadAlerts(alerts.unreadCount);
   }, [token]);
 
   useEffect(() => {
@@ -111,6 +119,11 @@ export default function DriverHomeScreen() {
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Sawubona, {dashboard.firstName}</Text>
         <Text style={styles.heroSubtitle}>★ {dashboard.averageRating.toFixed(1)} rating</Text>
+        {unreadAlerts > 0 && (
+          <View style={styles.alertBadge}>
+            <Text style={styles.alertBadgeText}>{unreadAlerts} new job alert(s)</Text>
+          </View>
+        )}
         <View style={styles.onlineRow}>
           <Text style={styles.onlineLabel}>{dashboard.isOnline ? 'Online' : 'Offline'}</Text>
           <Switch
@@ -185,6 +198,15 @@ const styles = StyleSheet.create({
   },
   heroTitle: { color: '#fff', fontSize: 24, fontWeight: '800' },
   heroSubtitle: { color: '#cbd5e1', marginTop: 4, marginBottom: 16 },
+  alertBadge: {
+    backgroundColor: '#6366f1',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  alertBadgeText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   onlineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   onlineLabel: { color: '#fff', fontWeight: '700', fontSize: 16 },
   statsGrid: { flexDirection: 'row', gap: 10, marginBottom: 16 },

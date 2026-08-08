@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { AdminLoginDto } from '../admin/dto/admin.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from './types';
@@ -25,6 +26,11 @@ export class AuthController {
   @Post('complete-profile')
   completeProfile(@Body() dto: CompleteProfileDto & { userId: string }) {
     return this.authService.completeProfile(dto.userId, dto);
+  }
+
+  @Post('admin/login')
+  adminLogin(@Body() dto: AdminLoginDto) {
+    return this.authService.adminLogin(dto);
   }
 
   @Get('me')

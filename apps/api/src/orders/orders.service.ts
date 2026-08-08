@@ -11,6 +11,7 @@ import {
 } from '@kasieats/shared';
 import { Prisma } from '@kasieats/db';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 
 type OrderWithDetails = Prisma.OrderGetPayload<{
@@ -23,7 +24,10 @@ type OrderWithDetails = Prisma.OrderGetPayload<{
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async createOrder(customerUserId: string, dto: CreateOrderDto) {
     const customer = await this.prisma.customer.findUnique({
@@ -114,6 +118,22 @@ export class OrdersService {
         order_items: { include: { menu_item: true } },
         vendor: true,
       },
+    });
+
+    await this.notifications.notifyVendorByVendorId(
+      vendor.id,
+      'New order received!',
+      `You have a new order for R${totalAmount.toFixed(2)}. Accept it now.`,
+      'new_order',
+      order.id,
+    );
+
+    await this.notifications.notify({
+      userId: customerUserId,
+      title: 'Order placed',
+      message: `Your order from ${vendor.store_name} has been sent to the kitchen.`,
+      notificationType: 'order_placed',
+      relatedOrderId: order.id,
     });
 
     return {
