@@ -30,12 +30,13 @@ Launch KasiEats in **Rustenburg townships** with 5 active food outlets, 1 active
 ## Launch checklist
 
 - [ ] Run `docker compose up -d && yarn db:migrate && yarn db:seed`
+- [ ] Or production-like stack: `docker compose up -d --build api` (includes API container)
 - [ ] Start API (:3000), vendor web (:3001), admin (:3002), customer + driver apps
 - [ ] Admin approves pending vendors/drivers
 - [ ] Onboard 5 real vendors using vendor phones above as templates
 - [ ] Run 10 test orders end-to-end (customer → vendor → driver → delivered)
 - [ ] Enable Ozow/Yoco production keys when ready (`PAYMENTS_SANDBOX=false`)
-- [ ] Configure Firebase for push notifications (`FIREBASE_PROJECT_ID`)
+- [ ] Configure Firebase for push notifications (`FIREBASE_PROJECT_ID`) — optional; Expo push tokens work via `POST /notifications/register-device`
 - [ ] Set SMS provider for production OTP (`SMS_PROVIDER=twilio` or `africas_talking`)
 
 ## Vendor self-service
