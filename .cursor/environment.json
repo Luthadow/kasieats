@@ -1,0 +1,27 @@
+{
+  "name": "kasieats-local",
+  "install": "yarn install && yarn workspace @kasieats/db db:generate",
+  "start": "bash scripts/dev-bootstrap.sh",
+  "terminals": [
+    {
+      "name": "api",
+      "command": "bash -lc 'cd apps/api && set -a && source .env.local && set +a && yarn dev'",
+      "description": "NestJS API at http://localhost:3000 (Swagger: /api/docs)"
+    },
+    {
+      "name": "vendor-web",
+      "command": "yarn workspace @kasieats/vendor-web dev",
+      "description": "Vendor dashboard at http://localhost:3001 — login 0831234567 OTP 123456"
+    },
+    {
+      "name": "admin-web",
+      "command": "yarn workspace @kasieats/admin-web dev",
+      "description": "Admin dashboard at http://localhost:3002 — login admin@kasieats.co.za / Admin123!"
+    }
+  ],
+  "ports": [
+    { "name": "api", "port": 3000 },
+    { "name": "vendor-web", "port": 3001 },
+    { "name": "admin-web", "port": 3002 }
+  ]
+}

@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'cursor/**']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: yarn workspace @kasieats/db db:generate
+
+      - name: Build packages and apps
+        run: |
+          yarn workspace @kasieats/shared build
+          yarn workspace @kasieats/db build
+          yarn workspace @kasieats/api build
+          yarn workspace @kasieats/admin-web build
+          yarn workspace @kasieats/vendor-web build
