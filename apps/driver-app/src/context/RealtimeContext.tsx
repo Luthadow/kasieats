@@ -12,6 +12,7 @@ import * as Notifications from 'expo-notifications';
 import type { NotificationEvent, OrderUpdateEvent } from '@kasieats/shared';
 import { getRealtimeBaseUrl, getUserIdFromToken } from '@kasieats/shared';
 import { API_URL } from '../services/api';
+import { registerPushToken } from '../services/push';
 import { useAuth } from './AuthContext';
 
 Notifications.setNotificationHandler({
@@ -58,6 +59,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       Notifications.requestPermissionsAsync().catch(() => null);
     }
   }, []);
+
+  useEffect(() => {
+    if (token) {
+      registerPushToken(token).catch(() => null);
+    }
+  }, [token]);
 
   const emitSubscribe = useCallback(
     (socket: Socket) => {

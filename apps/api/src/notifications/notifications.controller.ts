@@ -1,8 +1,9 @@
-import { Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/types';
 import { NotificationsService } from './notifications.service';
+import { RegisterDeviceDto } from './dto/register-device.dto';
 
 @ApiTags('notifications')
 @Controller('notifications')
@@ -10,6 +11,11 @@ import { NotificationsService } from './notifications.service';
 @ApiBearerAuth()
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  @Post('register-device')
+  registerDevice(@Req() req: AuthenticatedRequest, @Body() dto: RegisterDeviceDto) {
+    return this.notificationsService.registerDevice(req.user.sub, dto);
+  }
 
   @Get()
   list(@Req() req: AuthenticatedRequest, @Query('unreadOnly') unreadOnly?: string) {

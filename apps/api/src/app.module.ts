@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { OrdersModule } from './orders/orders.module';
@@ -23,6 +24,7 @@ import { RealtimeModule } from './realtime/realtime.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    RedisModule,
     PrismaModule,
     SmsModule,
     WalletModule,

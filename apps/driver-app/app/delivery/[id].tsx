@@ -5,6 +5,7 @@ import { DELIVERY_STATUS_LABELS, ORDER_STATUS_LABELS } from '@kasieats/shared';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRealtime } from '../../src/context/RealtimeContext';
 import { apiRequest } from '../../src/services/api';
+import { getCurrentCoords } from '../../src/services/location';
 
 interface DeliveryDetail {
   id: string;
@@ -92,7 +93,7 @@ export default function DeliveryScreen() {
         '/driver/location',
         {
           method: 'POST',
-          body: JSON.stringify({ latitude: -25.66, longitude: 27.24 }),
+          body: JSON.stringify(await getCurrentCoords()),
         },
         token,
       );

@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderEventsService } from '../realtime/order-events.service';
+import { PushService } from './push.service';
+import type { RegisterDeviceDto } from './dto/register-device.dto';
 
 interface NotifyInput {
   userId: string;
@@ -14,11 +16,10 @@ interface NotifyInput {
 
 @Injectable()
 export class NotificationsService {
-  private readonly logger = new Logger(NotificationsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly orderEvents: OrderEventsService,
+    private readonly pushService: PushService,
   ) {}
 
   async notify(input: NotifyInput) {
@@ -36,10 +37,16 @@ export class NotificationsService {
       },
     });
 
-    // Push via FCM when FIREBASE_PROJECT_ID is configured
-    if (process.env.FIREBASE_PROJECT_ID) {
-      this.logger.log(`Push queued for user ${input.userId}: ${input.title}`);
-    }
+    // Push to registered Expo devices (background alerts)
+    await this.pushService.sendToUser({
+      userId: input.userId,
+      title: input.title,
+      message: input.message,
+      data: {
+        type: input.notificationType,
+        ...(input.relatedOrderId ? { orderId: input.relatedOrderId } : {}),
+      },
+    });
 
     this.orderEvents.emitNotification({
       userId: input.userId,
@@ -88,6 +95,19 @@ export class NotificationsService {
         }),
       ),
     );
+  }
+
+  async registerDevice(userId: string, dto: RegisterDeviceDto) {
+    await this.prisma.devicePushToken.upsert({
+      where: { token: dto.token },
+      update: { user_id: userId, platform: dto.platform },
+      create: {
+        user_id: userId,
+        token: dto.token,
+        platform: dto.platform,
+      },
+    });
+    return { success: true };
   }
 
   async listForUser(userId: string, unreadOnly = false) {

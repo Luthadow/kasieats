@@ -40,6 +40,7 @@ model User {
   customer            Customer?
   vendor              Vendor?
   driver              Driver?
+  device_push_tokens  DevicePushToken[]
 
   @@index([email])
   @@index([phone])
@@ -464,6 +465,20 @@ model Notification {
   @@index([user_id])
   @@index([notification_type])
   @@index([is_read])
+}
+
+model DevicePushToken {
+  id         String   @id @default(cuid())
+  user_id    String
+  token      String   @unique
+  platform   String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("device_push_tokens")
 }
 
 model Wallet {

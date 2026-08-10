@@ -20,7 +20,15 @@
       },
       "package": "co.za.kasieats.driver"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "KasiEats Driver uses your location to share live delivery tracking with customers."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

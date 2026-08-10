@@ -14,6 +14,7 @@ import { DELIVERY_STATUS_LABELS } from '@kasieats/shared';
 import { useAuth } from '../src/context/AuthContext';
 import { useRealtime } from '../src/context/RealtimeContext';
 import { apiRequest } from '../src/services/api';
+import { getCurrentCoords } from '../src/services/location';
 
 interface DashboardData {
   firstName: string;
@@ -79,14 +80,15 @@ export default function DriverHomeScreen() {
 
   const toggleOnline = async (isOnline: boolean) => {
     if (!token) return;
+    const coords = await getCurrentCoords();
     await apiRequest(
       '/driver/status',
       {
         method: 'POST',
         body: JSON.stringify({
           isOnline,
-          latitude: -25.6544,
-          longitude: 27.2389,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
         }),
       },
       token,

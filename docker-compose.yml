@@ -49,6 +49,31 @@ services:
       timeout: 10s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: kasieats-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://kasieats_user:kasieats_password@postgres:5432/kasieats
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://kasieats_user:kasieats_password@rabbitmq:5672
+      JWT_SECRET: change-me-in-production-use-long-random-string
+      JWT_EXPIRES_IN: 7d
+      NODE_ENV: development
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:3001,http://localhost:3002,http://localhost:8081,http://localhost:8082
+      PAYMENTS_SANDBOX: "true"
+      SMS_PROVIDER: dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../sms/sms.service';
+import { OtpService } from './otp.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
@@ -12,27 +13,19 @@ import { DriverRegisterDto } from './dto/driver-register.dto';
 import { AdminLoginDto } from '../admin/dto/admin.dto';
 import type { JwtPayload } from '@kasieats/shared';
 
-const DEV_OTP = '123456';
-
 @Injectable()
 export class AuthService {
-  private otpStore = new Map<string, { code: string; expiresAt: number }>();
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly smsService: SmsService,
+    private readonly otpService: OtpService,
   ) {}
 
   async sendOtp(dto: SendOtpDto) {
     const phone = this.normalizePhone(dto.phone);
-    const code = process.env.NODE_ENV === 'production' ? this.generateOtp() : DEV_OTP;
-
-    this.otpStore.set(phone, {
-      code,
-      expiresAt: Date.now() + 60_000,
-    });
+    const code = await this.otpService.issue(phone);
 
     await this.smsService.sendOtp(phone, code);
 
@@ -40,23 +33,13 @@ export class AuthService {
       success: true,
       message: 'OTP sent',
       phone,
-      ...(process.env.NODE_ENV !== 'production' && { devOtp: code }),
+      ...(this.configService.get<string>('NODE_ENV') !== 'production' && { devOtp: code }),
     };
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
     const phone = this.normalizePhone(dto.phone);
-    const stored = this.otpStore.get(phone);
-
-    if (!stored || stored.expiresAt < Date.now()) {
-      throw new UnauthorizedException('OTP expired. Request a new code.');
-    }
-
-    if (stored.code !== dto.otp) {
-      throw new UnauthorizedException('Invalid OTP');
-    }
-
-    this.otpStore.delete(phone);
+    await this.otpService.verify(phone, dto.otp);
 
     let user = await this.prisma.user.findUnique({ where: { phone } });
 
@@ -188,7 +171,7 @@ export class AuthService {
 
   async registerVendor(dto: VendorRegisterDto) {
     const phone = this.normalizePhone(dto.phone);
-    this.consumeOtp(phone, dto.otp);
+    await this.otpService.verify(phone, dto.otp);
 
     const existing = await this.prisma.user.findUnique({ where: { phone } });
     if (existing?.user_type === 'vendor') {
@@ -251,7 +234,7 @@ export class AuthService {
 
   async registerDriver(dto: DriverRegisterDto) {
     const phone = this.normalizePhone(dto.phone);
-    this.consumeOtp(phone, dto.otp);
+    await this.otpService.verify(phone, dto.otp);
 
     const existing = await this.prisma.user.findUnique({ where: { phone } });
     if (existing?.user_type === 'driver') {
@@ -362,20 +345,5 @@ export class AuthService {
     if (digits.startsWith('27')) return `+${digits}`;
     if (digits.startsWith('0')) return `+27${digits.slice(1)}`;
     return `+${digits}`;
-  }
-
-  private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-
-  private consumeOtp(phone: string, otp: string) {
-    const stored = this.otpStore.get(phone);
-    if (!stored || stored.expiresAt < Date.now()) {
-      throw new UnauthorizedException('OTP expired. Request a new code.');
-    }
-    if (stored.code !== otp) {
-      throw new UnauthorizedException('Invalid OTP');
-    }
-    this.otpStore.delete(phone);
   }
 }
